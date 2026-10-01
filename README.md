@@ -32,7 +32,7 @@ pnpm dev:fake          # FAKE desktop
 
 Desktop buttons **Blender cube** / **Tripo fox** run the hard paths (no model required). Chat uses Codex.
 
-Protocol traces: `~/3d-agent-workspaces/default/.lab/rpc.jsonl` or `tmp-ws/.lab/rpc.jsonl`.
+Chat transcript lives in workspace SQLite (`~/3d-agent-workspaces/default/.lab/lab.sqlite`). Codex keeps the durable thread (`ephemeral: false`); the db only stores `threadId` + UI messages + last GLB. Refresh resumes the same Codex thread.
 
 ## Check
 

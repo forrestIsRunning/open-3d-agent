@@ -124,6 +124,27 @@ rl.on("line", (line) => {
     write({ jsonrpc: "2.0", id: msg.id, error: { code: -32000, message: "not initialized" } });
     return;
   }
+  if (msg.method === ClientMethod.threadResume) {
+    const id = String(msg.params?.threadId ?? thread.id);
+    thread.id = id;
+    respond(msg.id, {
+      thread,
+      model: "fake-model",
+      modelProvider: "fake",
+      serviceTier: null,
+      disabledPluginIds: [],
+      cwd: process.cwd(),
+      runtimeWorkspaceRoots: [],
+      instructionSources: [],
+      approvalPolicy: "never",
+      approvalsReviewer: "owner",
+      sandbox: { type: "workspaceWrite" },
+      activePermissionProfile: null,
+      reasoningEffort: null,
+      multiAgentMode: "explicitRequestOnly",
+    });
+    return;
+  }
   if (msg.method === ClientMethod.threadStart) {
     respond(msg.id, {
       thread,

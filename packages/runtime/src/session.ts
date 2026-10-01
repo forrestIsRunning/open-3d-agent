@@ -22,6 +22,7 @@ export type StartSessionOptions = {
   approvalPolicy?: "never" | "on-request";
   sandbox?: "workspace-write" | "read-only";
   autoApprove?: boolean;
+  threadId?: string;
   events?: SessionEvents;
 };
 
@@ -49,12 +50,12 @@ export class AgentSession {
   async start(): Promise<unknown> {
     await this.client.start();
     const init = await this.client.initialize();
-    const started = (await this.client.request(ClientMethod.threadStart, {
+    const threadParams = {
       cwd: this.workspace,
       model: this.opts.model,
       approvalPolicy: this.opts.approvalPolicy ?? "never",
       sandbox: this.opts.sandbox ?? "workspace-write",
-      ephemeral: true,
+      ephemeral: false,
       experimentalRawEvents: false,
       dynamicTools: [
         {
@@ -71,7 +72,25 @@ export class AgentSession {
           },
         },
       ],
-    })) as { thread?: { id?: string } };
+    };
+    if (this.opts.threadId) {
+      try {
+        const resumed = (await this.client.request(ClientMethod.threadResume, {
+          threadId: this.opts.threadId,
+          cwd: this.workspace,
+          model: this.opts.model,
+          approvalPolicy: this.opts.approvalPolicy ?? "never",
+          sandbox: this.opts.sandbox ?? "workspace-write",
+        })) as { thread?: { id?: string } };
+        this.threadId = resumed.thread?.id ?? this.opts.threadId;
+        if (this.threadId) return init;
+      } catch {
+        /* start a new durable thread */
+      }
+    }
+    const started = (await this.client.request(ClientMethod.threadStart, threadParams)) as {
+      thread?: { id?: string };
+    };
     this.threadId = started.thread?.id ?? "";
     if (!this.threadId) throw new Error("thread/start returned empty thread.id");
     return init;

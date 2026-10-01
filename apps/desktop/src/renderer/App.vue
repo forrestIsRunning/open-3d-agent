@@ -13,6 +13,7 @@ const model = ref("");
 const policy = ref("");
 const workspace = ref("");
 const assetName = ref("");
+const waiting = ref(false);
 const approval = ref<{ id: string; text: string } | null>(null);
 const viewRef = ref<HTMLElement | null>(null);
 let unsub: (() => void) | undefined;
@@ -36,12 +37,17 @@ onMounted(async () => {
   }
   unsub = window.lab.onEvent((ev) => {
     if (ev.method === "agent.text") {
+      waiting.value = false;
       messages.value.push({ role: "agent", text: String((ev.params as { text: string }).text) });
     }
     if (ev.method === "agent.tool") {
       messages.value.push({ role: "tool", text: JSON.stringify(ev.params) });
     }
+    if (ev.method === "turn.done") {
+      waiting.value = false;
+    }
     if (ev.method === "turn.error") {
+      waiting.value = false;
       messages.value.push({ role: "system", text: String((ev.params as { message: string }).message) });
     }
     if (ev.method === "approval.needed") {
@@ -61,12 +67,19 @@ onMounted(async () => {
     model.value = info.model ?? "";
     policy.value = info.approvalPolicy ?? "never";
     workspace.value = info.workspace;
-    messages.value.push({
-      role: "system",
-      text: `已连接 ${info.workspace}`,
-    });
-    const latest = await window.lab.latestModel();
-    if (latest.name) await showModel(latest.name);
+    if (info.messages?.length) {
+      messages.value = info.messages.map((m) => ({
+        role: m.role as Msg["role"],
+        text: m.text,
+      }));
+    } else {
+      messages.value.push({
+        role: "system",
+        text: `已连接 ${info.workspace} · thread ${info.threadId ?? "new"}`,
+      });
+    }
+    const latest = info.lastAsset || (await window.lab.latestModel()).name;
+    if (latest) await showModel(latest);
   }
   ready.value = true;
 });
@@ -78,12 +91,18 @@ async function send(): Promise<void> {
   if (!text) return;
   messages.value.push({ role: "user", text });
   input.value = "";
+  waiting.value = true;
   const cubeTalk = /立方体|cube/i.test(text);
   const foxTalk = /狐狸|fox|生成.*3d|文生3d/i.test(text);
-  const pending = [window.lab.send(text)];
-  if (cubeTalk) pending.push(cube());
-  else if (foxTalk) pending.push(fox());
-  await Promise.all(pending);
+  try {
+    const pending = [window.lab.send(text)];
+    if (cubeTalk) pending.push(cube());
+    else if (foxTalk) pending.push(fox());
+    await Promise.all(pending);
+  } catch (err) {
+    waiting.value = false;
+    messages.value.push({ role: "system", text: String(err) });
+  }
 }
 
 async function decide(allow: boolean): Promise<void> {
@@ -161,6 +180,10 @@ async function fox(): Promise<void> {
           <span class="who">{{ m.role }}</span>
           <p>{{ m.text }}</p>
         </article>
+        <article v-if="waiting" class="msg agent">
+          <span class="who">agent</span>
+          <p class="pulse">正在回复…</p>
+        </article>
       </div>
 
       <div v-if="approval" class="approval">
@@ -189,6 +212,7 @@ async function fox(): Promise<void> {
       <div class="hud">
         <span>{{ assetName || "视窗" }}</span>
         <span v-if="busy">导出中…</span>
+        <span v-else-if="waiting">模型思考中…</span>
         <span class="path" :title="workspace">{{ workspace }}</span>
       </div>
     </main>
@@ -283,6 +307,7 @@ async function fox(): Promise<void> {
   margin-bottom: 4px;
 }
 .msg p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.pulse { opacity: 0.7; }
 .msg.user { background: #243044; }
 .msg.agent { background: #17312c; }
 .msg.agent .who { color: var(--agent); }

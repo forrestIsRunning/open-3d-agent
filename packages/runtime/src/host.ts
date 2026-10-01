@@ -12,6 +12,7 @@ import { loadDotenv } from "./dotenv.ts";
 import { fakeServerFile, nodeBin, sessionEnv, tsxCli } from "./spawn-paths.ts";
 import { runCube } from "./run-cube.ts";
 import { runTripo } from "./run-tripo.ts";
+import { openLabDb, type LabDb } from "./lab-db.ts";
 
 loadDotenv();
 
@@ -26,6 +27,7 @@ function reply(id: unknown, result: unknown): void {
 let session: AgentSession | null = null;
 let workspace = "";
 let startedFake = false;
+let db: LabDb | null = null;
 
 const rl = createInterface({ input: process.stdin });
 rl.on("line", async (line) => {
@@ -49,16 +51,25 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
     const cfg = loadConfig();
     workspace = String(params.path);
     seedWorkspace(workspace, cfg.blenderBin);
+    db?.close();
+    db = openLabDb(workspace);
     return { workspace };
   }
   if (method === EnvelopeMethod.runtimeStart) {
     if (session) {
-      return { threadId: session.threadId, fake: startedFake, model: loadConfig().model };
+      return {
+        threadId: session.threadId,
+        fake: startedFake,
+        model: loadConfig().model,
+        messages: db?.listMessages() ?? [],
+        lastAsset: db?.getMeta("lastAsset"),
+      };
     }
     const cfg = loadConfig();
     writeIsolatedCodexHome(cfg);
     startedFake = Boolean(params.fake);
     const fake = startedFake;
+    if (!db) db = openLabDb(workspace);
     session = new AgentSession({
       workspace,
       command: fake ? nodeBin() : "codex",
@@ -74,29 +85,49 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       model: fake ? undefined : cfg.model,
       approvalPolicy: cfg.approvalPolicy,
       autoApprove: cfg.approvalPolicy === "never",
+      threadId: db.getMeta("threadId"),
       events: {
-        onText: (text) => emit(EnvelopeEventMethod.agentText, { text }),
-        onTool: (info) => emit(EnvelopeEventMethod.agentTool, info),
+        onText: (text) => {
+          db?.addMessage("agent", text);
+          emit(EnvelopeEventMethod.agentText, { text });
+        },
+        onTool: (info) => {
+          const text = JSON.stringify(info);
+          db?.addMessage("tool", text);
+          emit(EnvelopeEventMethod.agentTool, info);
+        },
         onTurnDone: (status) => emit(EnvelopeEventMethod.turnDone, { status }),
-        onTurnError: (message) => emit(EnvelopeEventMethod.turnError, { message }),
+        onTurnError: (message) => {
+          db?.addMessage("system", message);
+          emit(EnvelopeEventMethod.turnError, { message });
+        },
         onApproval: (id, m, p) =>
           emit(EnvelopeEventMethod.approvalNeeded, { id, method: m, params: p }),
         onUserInput: (id, p) => emit(EnvelopeEventMethod.userInputNeeded, { id, params: p }),
-        onModelReady: (path) => emit(EnvelopeEventMethod.modelReady, { path }),
+        onModelReady: (path) => {
+          const name = path.split("/").pop() ?? path;
+          db?.setMeta("lastAsset", name);
+          emit(EnvelopeEventMethod.modelReady, { path });
+        },
       },
     });
     const init = await session.start();
+    db.setMeta("threadId", session.threadId);
     return {
       init,
       threadId: session.threadId,
       fake,
       model: cfg.model,
       approvalPolicy: cfg.approvalPolicy,
+      messages: db.listMessages(),
+      lastAsset: db.getMeta("lastAsset"),
     };
   }
   if (method === EnvelopeMethod.turnSend) {
     if (!session) throw new Error("runtime not started");
-    return await session.send(String(params.text ?? ""));
+    const text = String(params.text ?? "");
+    db?.addMessage("user", text);
+    return await session.send(text);
   }
   if (method === EnvelopeMethod.turnInterrupt) {
     if (!session) throw new Error("runtime not started");

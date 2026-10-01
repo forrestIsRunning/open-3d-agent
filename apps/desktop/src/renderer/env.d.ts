@@ -8,6 +8,9 @@ declare global {
         fake?: boolean;
         model?: string;
         approvalPolicy?: string;
+        threadId?: string;
+        messages?: Array<{ role: string; text: string }>;
+        lastAsset?: string;
       }>;
       send: (text: string) => Promise<unknown>;
       approve: (id: string, result: unknown) => Promise<unknown>;

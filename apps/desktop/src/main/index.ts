@@ -107,12 +107,22 @@ app.whenReady().then(async () => {
         await sendHost(EnvelopeMethod.workspaceOpen, { path: workspace });
         const started = (await sendHost(EnvelopeMethod.runtimeStart, {
           fake: process.env.LAB_FAKE === "1",
-        })) as { fake?: boolean; model?: string; approvalPolicy?: string };
+        })) as {
+          fake?: boolean;
+          model?: string;
+          approvalPolicy?: string;
+          threadId?: string;
+          messages?: Array<{ role: string; text: string }>;
+          lastAsset?: string;
+        };
         return {
           workspace,
           fake: Boolean(started.fake),
           model: started.model,
           approvalPolicy: started.approvalPolicy,
+          threadId: started.threadId,
+          messages: started.messages ?? [],
+          lastAsset: started.lastAsset,
         };
       })();
     }
