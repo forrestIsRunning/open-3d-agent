@@ -2,6 +2,8 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import { mountViewer, loadGlb } from "./viewer.ts";
 
+let opened = false;
+
 type Msg = { role: "user" | "agent" | "tool" | "system"; text: string };
 
 const messages = ref<Msg[]>([]);
@@ -33,8 +35,11 @@ onMounted(async () => {
       messages.value.push({ role: "system", text: `产物：${name}` });
     }
   });
-  const info = await window.lab.open();
-  messages.value.push({ role: "system", text: `workspace ${info.workspace}` });
+  if (!opened) {
+    opened = true;
+    const info = await window.lab.open();
+    messages.value.push({ role: "system", text: `workspace ${info.workspace}` });
+  }
   ready.value = true;
 });
 
@@ -84,7 +89,7 @@ function bindView(el: Element | null): void {
 </template>
 
 <style>
-.layout { display: grid; grid-template-columns: 380px 1fr; height: 100%; }
+.layout { display: grid; grid-template-columns: 380px 1fr; height: 100%; min-height: 0; }
 .chat { display: flex; flex-direction: column; border-right: 1px solid #ddd; }
 header { padding: 12px 16px; font-weight: 600; }
 .log { flex: 1; overflow: auto; padding: 12px 16px; }
@@ -95,6 +100,6 @@ header { padding: 12px 16px; font-weight: 600; }
 .system { color: #36c; }
 form { display: flex; gap: 8px; padding: 12px; }
 form input { flex: 1; }
-.view { background: #111; }
+.view { background: #1a1d23; min-width: 0; min-height: 0; overflow: hidden; position: relative; }
 .approval { padding: 8px 16px; background: #fff3cd; display: flex; gap: 8px; align-items: center; }
 </style>

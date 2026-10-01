@@ -17,6 +17,7 @@ protocol.registerSchemesAsPrivileged([
 
 let win: BrowserWindow | null = null;
 let host: ChildProcessWithoutNullStreams | null = null;
+let sessionReady: Promise<{ workspace: string }> | null = null;
 let nextId = 1;
 const pending = new Map<number, (v: unknown) => void>();
 
@@ -85,9 +86,14 @@ app.whenReady().then(async () => {
   });
   startHost();
   ipcMain.handle("lab:open", async () => {
-    await sendHost(EnvelopeMethod.workspaceOpen, { path: workspace });
-    await sendHost(EnvelopeMethod.runtimeStart, { fake: process.env.LAB_FAKE === "1" });
-    return { workspace };
+    if (!sessionReady) {
+      sessionReady = (async () => {
+        await sendHost(EnvelopeMethod.workspaceOpen, { path: workspace });
+        await sendHost(EnvelopeMethod.runtimeStart, { fake: process.env.LAB_FAKE === "1" });
+        return { workspace };
+      })();
+    }
+    return sessionReady;
   });
   ipcMain.handle("lab:send", async (_e, text: string) => sendHost(EnvelopeMethod.turnSend, { text }));
   ipcMain.handle("lab:approve", async (_e, payload: { id: string; result: unknown }) =>
