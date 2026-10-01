@@ -15,10 +15,12 @@ const model = ref("");
 const policy = ref("");
 const approval = ref<{ id: string; text: string } | null>(null);
 let unsub: (() => void) | undefined;
-let viewEl: HTMLDivElement | null = null;
+const viewRef = ref<HTMLDivElement | null>(null);
 let lastModel = "";
 
 onMounted(async () => {
+  await nextTick();
+  if (viewRef.value) mountViewer(viewRef.value);
   unsub = window.lab.onEvent((ev) => {
     if (ev.method === "agent.text") {
       messages.value.push({ role: "agent", text: String((ev.params as { text: string }).text) });
@@ -49,7 +51,6 @@ onMounted(async () => {
       role: "system",
       text: `workspace ${info.workspace} · policy ${policy.value || "never"}`,
     });
-    await nextTick();
     const latest = await window.lab.latestModel();
     if (latest.name) await showModel(latest.name);
   }
@@ -119,12 +120,7 @@ async function fox(): Promise<void> {
   }
 }
 
-function bindView(el: Element | null): void {
-  if (el instanceof HTMLDivElement && el !== viewEl) {
-    viewEl = el;
-    mountViewer(el);
-  }
-}
+
 </script>
 
 <template>
@@ -153,7 +149,7 @@ function bindView(el: Element | null): void {
         <button :disabled="!ready">Send</button>
       </form>
     </section>
-    <section class="view" :ref="bindView"></section>
+    <section class="view" ref="viewRef"></section>
   </div>
 </template>
 

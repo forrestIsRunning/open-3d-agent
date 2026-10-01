@@ -63,7 +63,20 @@ function resize(el: HTMLElement): void {
   renderer.setSize(w, h, false);
 }
 
-export function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<void> {
+export function isViewerMounted(): boolean {
+  return Boolean(scene && camera);
+}
+
+export async function whenViewerMounted(timeoutMs = 8000): Promise<void> {
+  const start = Date.now();
+  while (!isViewerMounted()) {
+    if (Date.now() - start > timeoutMs) throw new Error("viewer not mounted");
+    await new Promise<void>((r) => requestAnimationFrame(() => r()));
+  }
+}
+
+export async function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<void> {
+  await whenViewerMounted();
   if (!scene || !camera) return Promise.reject(new Error("viewer not mounted"));
   const copy = data instanceof Uint8Array ? data.slice() : new Uint8Array(data);
   const buf = copy.buffer;
