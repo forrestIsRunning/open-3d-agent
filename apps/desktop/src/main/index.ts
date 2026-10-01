@@ -3,7 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline";
-import { mkdirSync, readdirSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { EnvelopeMethod } from "@lab3d/protocol";
 
@@ -128,6 +128,12 @@ app.whenReady().then(async () => {
       .sort();
     const last = names.at(-1);
     return last ? { name: last } : {};
+  });
+  ipcMain.handle("lab:readModel", async (_e, name: string) => {
+    const base = String(name).replace(/^.*\//, "");
+    if (!/^lab-[\w-]+_\d+\.glb$/i.test(base)) throw new Error("bad model name");
+    const file = join(workspace, base);
+    return readFileSync(file);
   });
   ipcMain.handle("lab:runCube", async () => sendHost(EnvelopeMethod.runCube, {}));
   ipcMain.handle("lab:runTripo", async (_e, prompt?: string) =>

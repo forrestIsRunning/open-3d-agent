@@ -5,6 +5,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 let renderer: THREE.WebGLRenderer | null = null;
 let scene: THREE.Scene | null = null;
 let camera: THREE.PerspectiveCamera | null = null;
+let controls: OrbitControls | null = null;
 let current: THREE.Object3D | null = null;
 let placeholder: THREE.Object3D | null = null;
 
@@ -25,7 +26,7 @@ export function mountViewer(el: HTMLElement): void {
   renderer.domElement.style.height = "100%";
   el.appendChild(renderer.domElement);
 
-  const controls = new OrbitControls(camera, renderer.domElement);
+  controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
   scene.add(new THREE.AmbientLight(0xffffff, 0.7));
   const dir = new THREE.DirectionalLight(0xffffff, 0.9);
@@ -43,7 +44,7 @@ export function mountViewer(el: HTMLElement): void {
   scene.add(cube);
 
   const loop = () => {
-    controls.update();
+    controls!.update();
     renderer!.render(scene!, camera!);
     requestAnimationFrame(loop);
   };
@@ -62,12 +63,14 @@ function resize(el: HTMLElement): void {
   renderer.setSize(w, h, false);
 }
 
-export function loadGlb(url: string): Promise<void> {
+export function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<void> {
   if (!scene || !camera) return Promise.reject(new Error("viewer not mounted"));
+  const buf = data instanceof Uint8Array ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) : data;
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
-    loader.load(
-      url,
+    loader.parse(
+      buf as ArrayBuffer,
+      "",
       (gltf) => {
         if (placeholder) {
           scene!.remove(placeholder);
@@ -84,10 +87,15 @@ export function loadGlb(url: string): Promise<void> {
         camera!.position.copy(center).add(new THREE.Vector3(size * 0.7, size * 0.5, size * 0.7));
         camera!.lookAt(center);
         camera!.updateProjectionMatrix();
+        if (controls) {
+          controls.target.copy(center);
+          controls.update();
+        }
         resolve();
       },
-      undefined,
       (err) => reject(err instanceof Error ? err : new Error(String(err))),
     );
   });
 }
+
+

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
-import { mountViewer, loadGlb } from "./viewer.ts";
+import { mountViewer, loadGlbBuffer } from "./viewer.ts";
 
 let opened = false;
 
@@ -77,7 +77,9 @@ async function showModel(name: string): Promise<void> {
   if (!name || name === lastModel) return;
   lastModel = name;
   try {
-    await loadGlb(`lab-asset://workspace/${name}`);
+    const raw = await window.lab.readModel(name);
+    const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw as ArrayBuffer);
+    await loadGlbBuffer(bytes);
     messages.value.push({ role: "system", text: `产物：${name}` });
   } catch (err) {
     lastModel = "";
