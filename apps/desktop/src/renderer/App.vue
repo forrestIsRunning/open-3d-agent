@@ -16,6 +16,7 @@ const policy = ref("");
 const approval = ref<{ id: string; text: string } | null>(null);
 let unsub: (() => void) | undefined;
 let viewEl: HTMLDivElement | null = null;
+let lastModel = "";
 
 onMounted(async () => {
   unsub = window.lab.onEvent((ev) => {
@@ -35,8 +36,7 @@ onMounted(async () => {
     if (ev.method === "model.ready") {
       const path = String((ev.params as { path: string }).path);
       const name = path.split("/").pop() ?? "";
-      loadGlb(`lab-asset://workspace/${name}`);
-      messages.value.push({ role: "system", text: `产物：${name}` });
+      void showModel(name);
     }
   });
   if (!opened) {
@@ -47,7 +47,7 @@ onMounted(async () => {
     policy.value = info.approvalPolicy ?? "";
     messages.value.push({ role: "system", text: `workspace ${info.workspace}` });
     const latest = await window.lab.latestModel();
-    if (latest.name) loadGlb(`lab-asset://workspace/${latest.name}`);
+    if (latest.name) await showModel(latest.name);
   }
   ready.value = true;
 });
@@ -73,10 +73,24 @@ async function decide(allow: boolean): Promise<void> {
   approval.value = null;
 }
 
+async function showModel(name: string): Promise<void> {
+  if (!name || name === lastModel) return;
+  lastModel = name;
+  try {
+    await loadGlb(`lab-asset://workspace/${name}`);
+    messages.value.push({ role: "system", text: `产物：${name}` });
+  } catch (err) {
+    lastModel = "";
+    messages.value.push({ role: "system", text: `加载失败 ${name}: ${String(err)}` });
+  }
+}
+
 async function cube(): Promise<void> {
   busy.value = true;
   try {
-    await window.lab.runCube();
+    const r = (await window.lab.runCube()) as { path?: string };
+    const name = r?.path?.split("/").pop();
+    if (name) await showModel(name);
   } catch (err) {
     messages.value.push({ role: "system", text: String(err) });
   } finally {

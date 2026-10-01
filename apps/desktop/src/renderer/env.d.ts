@@ -12,7 +12,7 @@ declare global {
       send: (text: string) => Promise<unknown>;
       approve: (id: string, result: unknown) => Promise<unknown>;
       latestModel: () => Promise<{ name?: string }>;
-      runCube: () => Promise<unknown>;
+      runCube: () => Promise<{ path?: string }>;
       runTripo: (prompt?: string) => Promise<unknown>;
       stop: () => Promise<unknown>;
       onEvent: (cb: (ev: { method: string; params: unknown }) => void) => () => void;

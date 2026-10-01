@@ -93,8 +93,11 @@ async function createWindow(): Promise<void> {
 app.whenReady().then(async () => {
   protocol.handle("lab-asset", (req) => {
     const u = new URL(req.url);
-    const rel = decodeURIComponent(u.pathname.replace(/^\/workspace\//, ""));
+    const rel = decodeURIComponent(u.pathname).replace(/^\/+/, "");
     const file = join(workspace, rel);
+    if (!file.startsWith(workspace)) {
+      return new Response("forbidden", { status: 403 });
+    }
     return net.fetch(pathToFileURL(file).toString());
   });
   startHost();

@@ -62,16 +62,32 @@ function resize(el: HTMLElement): void {
   renderer.setSize(w, h, false);
 }
 
-export function loadGlb(url: string): void {
-  if (!scene) return;
+export function loadGlb(url: string): Promise<void> {
+  if (!scene || !camera) return Promise.reject(new Error("viewer not mounted"));
   const loader = new GLTFLoader();
-  loader.load(url, (gltf) => {
-    if (placeholder) {
-      scene!.remove(placeholder);
-      placeholder = null;
-    }
-    if (current) scene!.remove(current);
-    current = gltf.scene;
-    scene!.add(current);
+  return new Promise((resolve, reject) => {
+    loader.load(
+      url,
+      (gltf) => {
+        if (placeholder) {
+          scene!.remove(placeholder);
+          placeholder = null;
+        }
+        if (current) scene!.remove(current);
+        current = gltf.scene;
+        scene!.add(current);
+        const box = new THREE.Box3().setFromObject(current);
+        const size = box.getSize(new THREE.Vector3()).length() || 1;
+        const center = box.getCenter(new THREE.Vector3());
+        camera!.near = Math.max(size / 200, 0.01);
+        camera!.far = Math.max(size * 20, 50);
+        camera!.position.copy(center).add(new THREE.Vector3(size * 0.7, size * 0.5, size * 0.7));
+        camera!.lookAt(center);
+        camera!.updateProjectionMatrix();
+        resolve();
+      },
+      undefined,
+      (err) => reject(err instanceof Error ? err : new Error(String(err))),
+    );
   });
 }
