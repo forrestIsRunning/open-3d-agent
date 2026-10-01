@@ -18,8 +18,10 @@ export function seedWorkspace(workspace: string, blenderBin?: string): void {
   }
   writeFileSync(join(workspace, "AGENTS.md"), agents);
   copyTree(join(templatesRoot, "skills"), join(workspace, "skills"));
-  const cube = join(templatesRoot, "scripts/lab-cube.py");
-  if (existsSync(cube)) copyTree(cube, join(workspace, "scripts/lab-cube.py"));
+  for (const script of ["lab-cube.py", "lab-lamb.py"]) {
+    const src = join(templatesRoot, "scripts", script);
+    if (existsSync(src)) copyTree(src, join(workspace, "scripts", script));
+  }
 }
 
 function copyTree(src: string, dest: string): void {

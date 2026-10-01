@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { commitModel } from "./commit-model.ts";
-import { extraPath } from "./spawn-paths.ts";
+import { extraPath, labProxyEnv } from "./spawn-paths.ts";
 
 function findGlb(dir: string): string | null {
   if (!existsSync(dir)) return null;
@@ -24,7 +24,7 @@ export function runTripo(workspace: string, prompt = "a cute low poly fox"): str
   const r = spawnSync("tripo", ["make", prompt, "--yes", "--quiet", "--no-open", "-o", outDir], {
     cwd: workspace,
     encoding: "utf8",
-    env: { ...process.env, PATH: extraPath() },
+    env: { ...process.env, PATH: extraPath(), ...labProxyEnv() },
     timeout: 180_000,
   });
   if (r.status !== 0) {

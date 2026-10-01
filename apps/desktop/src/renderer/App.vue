@@ -93,10 +93,12 @@ async function send(): Promise<void> {
   input.value = "";
   waiting.value = true;
   const cubeTalk = /立方体|cube/i.test(text);
-  const foxTalk = /狐狸|fox|生成.*3d|文生3d/i.test(text);
+  const lambTalk = /小羊|羔羊|lamb|sheep/i.test(text);
+  const foxTalk = /狐狸|fox/i.test(text);
   try {
     const pending = [window.lab.send(text)];
     if (cubeTalk) pending.push(cube());
+    else if (lambTalk) pending.push(lamb());
     else if (foxTalk) pending.push(fox());
     await Promise.all(pending);
   } catch (err) {
@@ -134,6 +136,19 @@ async function cube(): Promise<void> {
   busy.value = true;
   try {
     const r = await window.lab.runCube();
+    const name = r?.path?.split("/").pop();
+    if (name) await showModel(name);
+  } catch (err) {
+    messages.value.push({ role: "system", text: String(err) });
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function lamb(): Promise<void> {
+  busy.value = true;
+  try {
+    const r = await window.lab.runLamb();
     const name = r?.path?.split("/").pop();
     if (name) await showModel(name);
   } catch (err) {
@@ -198,6 +213,7 @@ async function fox(): Promise<void> {
       <div class="dock">
         <div class="actions">
           <button class="primary" :disabled="!ready || busy" @click="cube">Blender 立方体</button>
+          <button :disabled="!ready || busy" @click="lamb">Blender 小羊</button>
           <button :disabled="!ready || busy" @click="fox">Tripo 狐狸</button>
         </div>
         <form @submit.prevent="send">

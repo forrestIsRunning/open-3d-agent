@@ -146,6 +146,7 @@ app.whenReady().then(async () => {
     return { name: base, b64: readFileSync(file).toString("base64") };
   });
   ipcMain.handle("lab:runCube", async () => sendHost(EnvelopeMethod.runCube, {}));
+  ipcMain.handle("lab:runLamb", async () => sendHost(EnvelopeMethod.runLamb, {}));
   ipcMain.handle("lab:runTripo", async (_e, prompt?: string) =>
     sendHost(EnvelopeMethod.runTripo, { prompt: prompt ?? "a cute low poly fox" }),
   );

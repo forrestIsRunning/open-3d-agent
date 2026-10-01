@@ -4,7 +4,10 @@ description: Generate a GLB from text or image with the local tripo CLI.
 ---
 
 ```
-tripo make "<prompt>" --yes -o exports/lab-tripo.glb
+export http_proxy=http://127.0.0.1:1087
+export https_proxy=http://127.0.0.1:1087
+export ALL_PROXY=socks5://127.0.0.1:1080
+tripo make "<prompt>" --yes --quiet --no-open -o exports/lab-tripo
 ```
 
 Image:

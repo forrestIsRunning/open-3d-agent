@@ -17,6 +17,7 @@ declare global {
       latestModel: () => Promise<{ name?: string }>;
       readModel: (name: string) => Promise<{ name: string; b64: string }>;
       runCube: () => Promise<{ path?: string }>;
+      runLamb: () => Promise<{ path?: string }>;
       runTripo: (prompt?: string) => Promise<{ path?: string }>;
       stop: () => Promise<unknown>;
       onEvent: (cb: (ev: { method: string; params: unknown }) => void) => () => void;

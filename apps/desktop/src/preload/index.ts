@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld("lab", {
   latestModel: () => ipcRenderer.invoke("lab:latestModel"),
   readModel: (name: string) => ipcRenderer.invoke("lab:readModel", name),
   runCube: () => ipcRenderer.invoke("lab:runCube"),
+  runLamb: () => ipcRenderer.invoke("lab:runLamb"),
   runTripo: (prompt?: string) => ipcRenderer.invoke("lab:runTripo", prompt),
   stop: () => ipcRenderer.invoke("lab:stop"),
   onEvent: (cb: (ev: { method: string; params: unknown }) => void) => {

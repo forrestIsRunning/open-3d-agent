@@ -6,7 +6,7 @@ description: Edit or create GLB with Blender headless Python.
 Write a script under `scripts/lab-*.py`. Run:
 
 ```
-"$BLENDER_BIN" --background --python scripts/lab-cube.py
+"$BLENDER_BIN" --factory-startup --background --python-exit-code 1 --python scripts/lab-cube.py
 ```
 
 The script must:

@@ -10,7 +10,7 @@ import { seedWorkspace } from "./workspace.ts";
 import { commitModel } from "./commit-model.ts";
 import { loadDotenv } from "./dotenv.ts";
 import { fakeServerFile, nodeBin, sessionEnv, tsxCli } from "./spawn-paths.ts";
-import { runCube } from "./run-cube.ts";
+import { runCube, runLamb } from "./run-cube.ts";
 import { runTripo } from "./run-tripo.ts";
 import { openLabDb, type LabDb } from "./lab-db.ts";
 
@@ -149,6 +149,11 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
   }
   if (method === EnvelopeMethod.runCube) {
     const dest = runCube(workspace);
+    emit(EnvelopeEventMethod.modelReady, { path: dest });
+    return { path: dest };
+  }
+  if (method === EnvelopeMethod.runLamb) {
+    const dest = runLamb(workspace);
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }

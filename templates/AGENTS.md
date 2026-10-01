@@ -12,13 +12,15 @@ You edit 3D models by writing Blender scripts. The user talks in natural languag
 
 Absolute binary: `$BLENDER_BIN` (never the bare name `blender`).
 
-A starter script is `scripts/lab-cube.py`. For “做一个立方体”:
+Always headless. GUI + Metal crashes on this Mac.
 
 ```
-"$BLENDER_BIN" --background --python scripts/lab-cube.py
+"$BLENDER_BIN" --factory-startup --background --python-exit-code 1 --python scripts/lab-*.py
 ```
 
-then call host tool `workspace_commit_model` with `name=cube` and `exportPath=exports/lab-cube.glb`.
+Do not set `scene.render.engine` to EEVEE / EEVEE_NEXT. GLB export does not need a viewport renderer.
+
+A starter script is `scripts/lab-cube.py`. Lamb mesh: `scripts/lab-lamb.py`. Then `workspace_commit_model`.
 
 Export:
 
@@ -30,13 +32,16 @@ Do not import `bpy` from the system Python.
 
 ## Tripo
 
-Use the `tripo` CLI already logged in on this machine:
+CLI is already logged in. Outbound calls need proxy (already in process env; set if missing):
 
 ```
-tripo make "<prompt>" --yes -o exports/lab-gen.glb
+export http_proxy=http://127.0.0.1:1087
+export https_proxy=http://127.0.0.1:1087
+export ALL_PROXY=socks5://127.0.0.1:1080
+tripo make "<prompt>" --yes --quiet --no-open -o exports/lab-tripo
 ```
 
-Then `workspace_commit_model`.
+`-o` is a **directory**. Then `workspace_commit_model` with the generated `.glb` path.
 
 ## Rules
 
