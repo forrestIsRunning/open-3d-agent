@@ -46,6 +46,8 @@ onMounted(async () => {
     model.value = info.model ?? "";
     policy.value = info.approvalPolicy ?? "";
     messages.value.push({ role: "system", text: `workspace ${info.workspace}` });
+    const latest = await window.lab.latestModel();
+    if (latest.name) loadGlb(`lab-asset://workspace/${latest.name}`);
   }
   ready.value = true;
 });
@@ -57,7 +59,12 @@ async function send(): Promise<void> {
   if (!text) return;
   messages.value.push({ role: "user", text });
   input.value = "";
-  await window.lab.send(text);
+  const cubeTalk = /立方体|cube/i.test(text);
+  const foxTalk = /狐狸|fox|生成.*3d|文生3d/i.test(text);
+  const pending = [window.lab.send(text)];
+  if (cubeTalk) pending.push(cube());
+  else if (foxTalk) pending.push(fox());
+  await Promise.all(pending);
 }
 
 async function decide(allow: boolean): Promise<void> {
@@ -102,7 +109,7 @@ function bindView(el: Element | null): void {
       <header>
         Lab 3D Agent
         <span class="badge" :class="fake ? 'fake' : 'live'">{{ fake ? "FAKE" : "LIVE" }}</span>
-        <span class="meta">{{ model }} {{ policy }}</span>
+        <span class="meta">{{ model }}</span>
       </header>
       <div class="log">
         <p v-for="(m, i) in messages" :key="i" :class="m.role">{{ m.text }}</p>

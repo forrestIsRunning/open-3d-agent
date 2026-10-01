@@ -11,6 +11,7 @@ declare global {
       }>;
       send: (text: string) => Promise<unknown>;
       approve: (id: string, result: unknown) => Promise<unknown>;
+      latestModel: () => Promise<{ name?: string }>;
       runCube: () => Promise<unknown>;
       runTripo: (prompt?: string) => Promise<unknown>;
       stop: () => Promise<unknown>;

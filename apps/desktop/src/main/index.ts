@@ -3,7 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { EnvelopeMethod } from "@lab3d/protocol";
 
@@ -119,6 +119,13 @@ app.whenReady().then(async () => {
   ipcMain.handle("lab:approve", async (_e, payload: { id: string; result: unknown }) =>
     sendHost(EnvelopeMethod.approvalRespond, payload),
   );
+  ipcMain.handle("lab:latestModel", async () => {
+    const names = readdirSync(workspace)
+      .filter((n) => /^lab-.*_\d+\.glb$/i.test(n))
+      .sort();
+    const last = names.at(-1);
+    return last ? { name: last } : {};
+  });
   ipcMain.handle("lab:runCube", async () => sendHost(EnvelopeMethod.runCube, {}));
   ipcMain.handle("lab:runTripo", async (_e, prompt?: string) =>
     sendHost(EnvelopeMethod.runTripo, { prompt: prompt ?? "a cute low poly fox" }),
