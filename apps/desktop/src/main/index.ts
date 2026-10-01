@@ -133,7 +133,7 @@ app.whenReady().then(async () => {
     const base = String(name).replace(/^.*\//, "");
     if (!/^lab-[\w-]+_\d+\.glb$/i.test(base)) throw new Error("bad model name");
     const file = join(workspace, base);
-    return readFileSync(file);
+    return { name: base, b64: readFileSync(file).toString("base64") };
   });
   ipcMain.handle("lab:runCube", async () => sendHost(EnvelopeMethod.runCube, {}));
   ipcMain.handle("lab:runTripo", async (_e, prompt?: string) =>

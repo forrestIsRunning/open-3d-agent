@@ -65,7 +65,8 @@ function resize(el: HTMLElement): void {
 
 export function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<void> {
   if (!scene || !camera) return Promise.reject(new Error("viewer not mounted"));
-  const buf = data instanceof Uint8Array ? data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) : data;
+  const copy = data instanceof Uint8Array ? data.slice() : new Uint8Array(data);
+  const buf = copy.buffer;
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
     loader.parse(

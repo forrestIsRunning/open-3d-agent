@@ -19,6 +19,7 @@
     "e2e:tripo": "pnpm --filter @lab3d/runtime e2e:tripo",
     "electron:install": "node scripts/install-electron.mjs",
     "dev": "pnpm --filter @lab3d/desktop dev",
-    "dev:fake": "LAB_FAKE=1 pnpm --filter @lab3d/desktop dev"
+    "dev:fake": "LAB_FAKE=1 pnpm --filter @lab3d/desktop dev",
+    "postinstall": "node scripts/install-electron.mjs"
   }
 }

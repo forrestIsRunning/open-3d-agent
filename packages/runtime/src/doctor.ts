@@ -19,6 +19,16 @@ const version = (codex.stdout || "").trim();
 checks.push(["codex", version.includes(pinned), `want ${pinned}, got ${version || codex.stderr}`]);
 checks.push(["blender", existsSync(cfg.blenderBin), cfg.blenderBin]);
 checks.push(["codex-home", existsSync(cfg.codexHome), cfg.codexHome]);
+const electronPkg = spawnSync("node", ["-p", "require.resolve('electron/package.json')"], {
+  cwd: join(repoRoot, "apps/desktop"),
+  encoding: "utf8",
+});
+const electronRoot = electronPkg.status === 0 ? join(electronPkg.stdout.trim(), "..") : "";
+const electronFw = electronRoot
+  ? join(electronRoot, "dist/Electron.app/Contents/Frameworks/Electron Framework.framework")
+  : "";
+const electronOk = Boolean(electronFw && existsSync(electronFw));
+checks.push(["electron", electronOk, electronOk ? electronFw : "run pnpm electron:install"]);
 checks.push([
   "api-key",
   fake || cfg.apiKey.length > 0,

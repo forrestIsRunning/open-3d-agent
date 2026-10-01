@@ -33,3 +33,14 @@ pnpm dev:fake          # FAKE desktop
 Desktop buttons **Blender cube** / **Tripo fox** run the hard paths (no model required). Chat uses Codex.
 
 Protocol traces: `~/3d-agent-workspaces/default/.lab/rpc.jsonl` or `tmp-ws/.lab/rpc.jsonl`.
+
+## Check
+
+| Item | How |
+|---|---|
+| LIVE Codex | `pnpm dev`, green LIVE, 「介绍一下自己」 is the model |
+| FAKE | `pnpm dev:fake`, red FAKE, canned AGENTS.md reply |
+| Blender cube | button or 「做一个立方体」 → orange GLB in the viewer, `~/3d-agent-workspaces/default/lab-cube_N.glb` |
+| Tripo | **Tripo fox**, logged-in `tripo`, `lab-fox_N.glb` |
+| Approval | `.env` `APPROVAL_POLICY=on-request`, Allow/Deny blocks the command; `pnpm test` includes wait-until-respond |
+| Electron zip | `pnpm install` / `pnpm electron:install` with `https_proxy`; doctor checks Frameworks |

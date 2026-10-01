@@ -116,6 +116,37 @@ test("T-deny declines command and fails turn", async () => {
   await s.stop();
 });
 
+test("T-approval waits until host responds", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "lab3d-"));
+  seedWorkspace(ws);
+  let done = "";
+  let approvalId = "";
+  const s = new AgentSession({
+    workspace: ws,
+    command: "tsx",
+    args: [fakeBin],
+    env: { ...process.env, FAKE_MODE: "approval" },
+    autoApprove: false,
+    events: {
+      onApproval: (id) => {
+        approvalId = String(id);
+      },
+      onTurnDone: (st) => {
+        done = st;
+      },
+    },
+  });
+  await s.start();
+  await s.send("run");
+  await new Promise((r) => setTimeout(r, 250));
+  assert.ok(approvalId);
+  assert.equal(done, "");
+  s.resolvePending(approvalId, { decision: "accept" });
+  await new Promise((r) => setTimeout(r, 250));
+  assert.equal(done, "completed");
+  await s.stop();
+});
+
 test("T-user-input auto empty answers", async () => {
   const ws = mkdtempSync(join(tmpdir(), "lab3d-"));
   seedWorkspace(ws);

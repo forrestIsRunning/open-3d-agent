@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { nextTick, onMounted, onUnmounted, ref } from "vue";
 import { mountViewer, loadGlbBuffer } from "./viewer.ts";
 
 let opened = false;
@@ -10,7 +10,7 @@ const messages = ref<Msg[]>([]);
 const input = ref("介绍一下自己");
 const ready = ref(false);
 const busy = ref(false);
-const fake = ref(true);
+const fake = ref<boolean | null>(null);
 const model = ref("");
 const policy = ref("");
 const approval = ref<{ id: string; text: string } | null>(null);
@@ -45,7 +45,11 @@ onMounted(async () => {
     fake.value = Boolean(info.fake);
     model.value = info.model ?? "";
     policy.value = info.approvalPolicy ?? "";
-    messages.value.push({ role: "system", text: `workspace ${info.workspace}` });
+    messages.value.push({
+      role: "system",
+      text: `workspace ${info.workspace} · policy ${policy.value || "never"}`,
+    });
+    await nextTick();
     const latest = await window.lab.latestModel();
     if (latest.name) await showModel(latest.name);
   }
@@ -78,7 +82,9 @@ async function showModel(name: string): Promise<void> {
   lastModel = name;
   try {
     const raw = await window.lab.readModel(name);
-    const bytes = raw instanceof Uint8Array ? raw : new Uint8Array(raw as ArrayBuffer);
+    const bin = atob(raw.b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
     await loadGlbBuffer(bytes);
     messages.value.push({ role: "system", text: `产物：${name}` });
   } catch (err) {
@@ -103,7 +109,9 @@ async function cube(): Promise<void> {
 async function fox(): Promise<void> {
   busy.value = true;
   try {
-    await window.lab.runTripo("a cute low poly fox");
+    const r = (await window.lab.runTripo("a cute low poly fox")) as { path?: string };
+    const name = r?.path?.split("/").pop();
+    if (name) await showModel(name);
   } catch (err) {
     messages.value.push({ role: "system", text: String(err) });
   } finally {
@@ -124,8 +132,9 @@ function bindView(el: Element | null): void {
     <section class="chat">
       <header>
         Lab 3D Agent
-        <span class="badge" :class="fake ? 'fake' : 'live'">{{ fake ? "FAKE" : "LIVE" }}</span>
-        <span class="meta">{{ model }}</span>
+        <span v-if="fake === true" class="badge fake">FAKE</span>
+        <span v-else-if="fake === false" class="badge live">LIVE</span>
+        <span class="meta">{{ model }} {{ policy }}</span>
       </header>
       <div class="log">
         <p v-for="(m, i) in messages" :key="i" :class="m.role">{{ m.text }}</p>
