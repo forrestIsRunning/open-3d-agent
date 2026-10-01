@@ -1,0 +1,22 @@
+{
+  "name": "@lab3d/runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test src/*.test.ts",
+    "lab": "tsx src/lab.ts",
+    "lab:fake": "tsx src/lab.ts --fake",
+    "doctor": "tsx src/doctor.ts",
+    "host": "tsx src/host.ts",
+    "fake": "tsx src/fake-appserver.ts"
+  },
+  "dependencies": {
+    "@lab3d/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

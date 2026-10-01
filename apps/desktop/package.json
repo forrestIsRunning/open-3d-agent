@@ -1,0 +1,25 @@
+{
+  "name": "@lab3d/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build"
+  },
+  "dependencies": {
+    "@lab3d/protocol": "workspace:*",
+    "pinia": "^3.0.3",
+    "three": "^0.180.0",
+    "vue": "^3.5.21"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "electron": "^37.3.1",
+    "electron-vite": "^4.0.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5"
+  }
+}

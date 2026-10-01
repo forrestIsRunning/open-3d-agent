@@ -1,0 +1,20 @@
+{
+  "name": "desktop-3d-agent",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "electron"]
+  },
+  "scripts": {
+    "proto:gen": "mkdir -p packages/protocol/schema packages/protocol/generated && codex app-server generate-json-schema --experimental --out packages/protocol/schema && codex app-server generate-ts --experimental --out packages/protocol/generated",
+    "typecheck": "tsc -p packages/runtime --noEmit",
+    "test": "pnpm --filter @lab3d/runtime test",
+    "lab": "pnpm --filter @lab3d/runtime lab",
+    "lab:fake": "pnpm --filter @lab3d/runtime lab:fake",
+    "doctor": "pnpm --filter @lab3d/runtime doctor",
+    "dev": "pnpm --filter @lab3d/desktop dev"
+  }
+}

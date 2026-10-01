@@ -1,0 +1,38 @@
+/**
+ * Desktop Main ↔ Runtime JSONL (not Codex JSON-RPC).
+ */
+export type EnvelopeRequest = {
+  jsonrpc: "2.0";
+  id: number | string;
+  method: string;
+  params?: unknown;
+};
+
+export type EnvelopeEvent = {
+  jsonrpc: "2.0";
+  method: string;
+  params?: unknown;
+};
+
+export const EnvelopeMethod = {
+  runtimeStart: "runtime.start",
+  runtimeStop: "runtime.stop",
+  workspaceOpen: "workspace.open",
+  threadStart: "thread.start",
+  turnSend: "turn.send",
+  turnInterrupt: "turn.interrupt",
+  approvalRespond: "approval.respond",
+  userInputRespond: "userInput.respond",
+  commitModel: "workspace.commitModel",
+} as const;
+
+export const EnvelopeEventMethod = {
+  agentText: "agent.text",
+  agentTool: "agent.tool",
+  turnDone: "turn.done",
+  turnError: "turn.error",
+  approvalNeeded: "approval.needed",
+  userInputNeeded: "userInput.needed",
+  modelReady: "model.ready",
+  log: "runtime.log",
+} as const;

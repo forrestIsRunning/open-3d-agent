@@ -1,0 +1,16 @@
+node_modules/
+dist/
+out/
+.release/
+.env
+.codex-home/
+workspaces/
+tmp-ws/
+**/*.glb
+!testdata/*.glb
+.DS_Store
+*.log
+apps/desktop/out/
+.lab/
+coverage/
+.vite/
