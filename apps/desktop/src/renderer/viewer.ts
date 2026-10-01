@@ -11,6 +11,9 @@ let placeholder: THREE.Object3D | null = null;
 
 export function mountViewer(el: HTMLElement): void {
   if (renderer) {
+    if (renderer.domElement.parentElement !== el) {
+      el.appendChild(renderer.domElement);
+    }
     resize(el);
     return;
   }
