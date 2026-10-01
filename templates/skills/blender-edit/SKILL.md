@@ -13,7 +13,7 @@ The script must:
 
 1. Create or import mesh
 2. Export GLB to `exports/`
-3. Ask the host to `workspace.commitModel`
+3. Ask the host to `workspace_commit_model`
 
 Minimal cube:
 

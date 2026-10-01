@@ -56,15 +56,57 @@ const thread = {
 
 let initialized = false;
 let nextTurn = 1;
+let pendingTurn: { threadId: string; turnId: string } | null = null;
+
+function finishHappy(threadId: string, turnId: string, text = "AGENTS.md is in this workspace."): void {
+  notify(ServerNotify.itemCompleted, {
+    threadId,
+    turnId,
+    completedAtMs: Date.now(),
+    item: {
+      type: "agentMessage",
+      id: "item-1",
+      text,
+      phase: null,
+      memoryCitation: null,
+      delivery: null,
+      questions: null,
+    },
+  });
+  notify(ServerNotify.turnCompleted, {
+    threadId,
+    turn: { id: turnId, status: "completed", error: null },
+  });
+}
+
+function finishFail(threadId: string, turnId: string, message: string): void {
+  notify(ServerNotify.turnCompleted, {
+    threadId,
+    turn: { id: turnId, status: "failed", error: { message } },
+  });
+}
 
 const rl = createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   const msg = JSON.parse(line) as {
     jsonrpc: string;
     id?: number | string;
-    method: string;
+    method?: string;
     params?: Record<string, unknown>;
+    result?: { decision?: string };
   };
+  if (!msg.method && msg.id != null && pendingTurn) {
+    const decision = String(msg.result?.decision ?? "");
+    const { threadId, turnId } = pendingTurn;
+    pendingTurn = null;
+    if (decision === "accept" || decision === "acceptForSession") {
+      finishHappy(threadId, turnId, "command allowed");
+    } else {
+      finishFail(threadId, turnId, "command declined");
+    }
+    return;
+  }
+  if (!msg.method) return;
   if (msg.method === ClientMethod.initialize) {
     respond(msg.id, {
       userAgent: "fake-appserver/0.1",
@@ -120,6 +162,7 @@ rl.on("line", (line) => {
     notify(ServerNotify.turnStarted, { threadId, turn: { id: turnId, status: "inProgress" } });
 
     if (mode === "approval") {
+      pendingTurn = { threadId, turnId };
       write({
         jsonrpc: "2.0",
         id: "srv-approval-1",

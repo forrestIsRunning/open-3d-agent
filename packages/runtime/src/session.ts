@@ -125,22 +125,25 @@ export class AgentSession {
       method === ServerMethod.fileChangeApproval
     ) {
       if (this.opts.autoApprove) return { decision: "accept" };
+      const pending = this.waitPending(String(id));
       this.opts.events?.onApproval?.(id, method, params);
-      return await this.waitPending(String(id));
+      return await pending;
     }
 
     if (method === ServerMethod.permissionsApproval) {
       if (this.opts.autoApprove) {
         return { permissions: {}, scope: "turn" };
       }
+      const pending = this.waitPending(String(id));
       this.opts.events?.onApproval?.(id, method, params);
-      return await this.waitPending(String(id));
+      return await pending;
     }
 
     if (method === ServerMethod.requestUserInput) {
       if (this.opts.autoApprove) return { answers: {} };
+      const pending = this.waitPending(String(id));
       this.opts.events?.onUserInput?.(id, params);
-      return await this.waitPending(String(id));
+      return await pending;
     }
 
     return {};

@@ -44,5 +44,5 @@ export const OptOutDeltas = [
 ] as const;
 
 export const HostTool = {
-  commitModel: "workspace.commitModel",
+  commitModel: "workspace_commit_model",
 } as const;

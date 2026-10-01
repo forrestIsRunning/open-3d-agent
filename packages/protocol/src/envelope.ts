@@ -24,6 +24,8 @@ export const EnvelopeMethod = {
   approvalRespond: "approval.respond",
   userInputRespond: "userInput.respond",
   commitModel: "workspace.commitModel",
+  runCube: "workspace.runCube",
+  runTripo: "workspace.runTripo",
 } as const;
 
 export const EnvelopeEventMethod = {

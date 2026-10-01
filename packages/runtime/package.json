@@ -9,7 +9,9 @@
     "lab:fake": "tsx src/lab.ts --fake",
     "doctor": "tsx src/doctor.ts",
     "host": "tsx src/host.ts",
-    "fake": "tsx src/fake-appserver.ts"
+    "fake": "tsx src/fake-appserver.ts",
+    "e2e:cube": "tsx src/e2e-cube.ts",
+    "e2e:tripo": "tsx src/e2e-tripo.ts"
   },
   "dependencies": {
     "@lab3d/protocol": "workspace:*"

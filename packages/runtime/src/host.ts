@@ -8,8 +8,12 @@ import { AgentSession } from "./session.ts";
 import { loadConfig, writeIsolatedCodexHome } from "./codex-home.ts";
 import { seedWorkspace } from "./workspace.ts";
 import { commitModel } from "./commit-model.ts";
-import { fileURLToPath } from "node:url";
-import { dirname as pathDirname } from "node:path";
+import { loadDotenv } from "./dotenv.ts";
+import { fakeServerFile, nodeBin, sessionEnv, tsxCli } from "./spawn-paths.ts";
+import { runCube } from "./run-cube.ts";
+import { runTripo } from "./run-tripo.ts";
+
+loadDotenv();
 
 function emit(method: string, params: unknown): void {
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n");
@@ -21,6 +25,7 @@ function reply(id: unknown, result: unknown): void {
 
 let session: AgentSession | null = null;
 let workspace = "";
+let startedFake = false;
 
 const rl = createInterface({ input: process.stdin });
 rl.on("line", async (line) => {
@@ -41,20 +46,30 @@ rl.on("line", async (line) => {
 
 async function handle(method: string, params: Record<string, unknown>): Promise<unknown> {
   if (method === EnvelopeMethod.workspaceOpen) {
+    const cfg = loadConfig();
     workspace = String(params.path);
-    seedWorkspace(workspace);
+    seedWorkspace(workspace, cfg.blenderBin);
     return { workspace };
   }
   if (method === EnvelopeMethod.runtimeStart) {
+    if (session) {
+      return { threadId: session.threadId, fake: startedFake, model: loadConfig().model };
+    }
     const cfg = loadConfig();
     writeIsolatedCodexHome(cfg);
-    const fake = Boolean(params.fake);
-    const fakeBin = join(pathDirname(fileURLToPath(import.meta.url)), "fake-appserver.ts");
+    startedFake = Boolean(params.fake);
+    const fake = startedFake;
     session = new AgentSession({
       workspace,
-      command: fake ? "tsx" : "codex",
-      args: fake ? [fakeBin] : ["app-server", "--listen", "stdio://"],
-      env: { ...process.env, CODEX_HOME: cfg.codexHome, OPENAI_API_KEY: cfg.apiKey },
+      command: fake ? nodeBin() : "codex",
+      args: fake ? [tsxCli(), fakeServerFile()] : ["app-server", "--listen", "stdio://"],
+      env: sessionEnv(process.env, {
+        CODEX_HOME: cfg.codexHome,
+        OPENAI_API_KEY: cfg.apiKey,
+        OPENAI_BASE_URL: cfg.baseUrl,
+        BLENDER_BIN: cfg.blenderBin,
+        ELECTRON_RUN_AS_NODE: fake ? "1" : "",
+      }),
       rpcLogPath: join(workspace, ".lab/rpc.jsonl"),
       model: fake ? undefined : cfg.model,
       approvalPolicy: cfg.approvalPolicy,
@@ -64,13 +79,20 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
         onTool: (info) => emit(EnvelopeEventMethod.agentTool, info),
         onTurnDone: (status) => emit(EnvelopeEventMethod.turnDone, { status }),
         onTurnError: (message) => emit(EnvelopeEventMethod.turnError, { message }),
-        onApproval: (id, m, p) => emit(EnvelopeEventMethod.approvalNeeded, { id, method: m, params: p }),
+        onApproval: (id, m, p) =>
+          emit(EnvelopeEventMethod.approvalNeeded, { id, method: m, params: p }),
         onUserInput: (id, p) => emit(EnvelopeEventMethod.userInputNeeded, { id, params: p }),
         onModelReady: (path) => emit(EnvelopeEventMethod.modelReady, { path }),
       },
     });
     const init = await session.start();
-    return { init, threadId: session.threadId };
+    return {
+      init,
+      threadId: session.threadId,
+      fake,
+      model: cfg.model,
+      approvalPolicy: cfg.approvalPolicy,
+    };
   }
   if (method === EnvelopeMethod.turnSend) {
     if (!session) throw new Error("runtime not started");
@@ -91,6 +113,16 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
   }
   if (method === EnvelopeMethod.commitModel) {
     const dest = commitModel(workspace, String(params.name), String(params.exportPath));
+    emit(EnvelopeEventMethod.modelReady, { path: dest });
+    return { path: dest };
+  }
+  if (method === EnvelopeMethod.runCube) {
+    const dest = runCube(workspace);
+    emit(EnvelopeEventMethod.modelReady, { path: dest });
+    return { path: dest };
+  }
+  if (method === EnvelopeMethod.runTripo) {
+    const dest = runTripo(workspace, String(params.prompt ?? "a cute low poly fox"));
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }

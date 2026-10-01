@@ -73,10 +73,46 @@ test("T-turn turn/start yields agentMessage and turn completed", async () => {
 test("T-approval auto-accept command approval", async () => {
   const ws = mkdtempSync(join(tmpdir(), "lab3d-"));
   seedWorkspace(ws);
-  const s = session(ws, { FAKE_MODE: "approval" });
+  let done = "";
+  const s = new AgentSession({
+    workspace: ws,
+    command: "tsx",
+    args: [fakeBin],
+    env: { ...process.env, FAKE_MODE: "approval" },
+    autoApprove: true,
+    events: { onTurnDone: (st) => (done = st) },
+  });
   await s.start();
   await s.send("run");
-  await new Promise((r) => setTimeout(r, 200));
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(done, "completed");
+  await s.stop();
+});
+
+test("T-deny declines command and fails turn", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "lab3d-"));
+  seedWorkspace(ws);
+  let err = "";
+  let approvalId = "";
+  const s = new AgentSession({
+    workspace: ws,
+    command: "tsx",
+    args: [fakeBin],
+    env: { ...process.env, FAKE_MODE: "approval" },
+    autoApprove: false,
+    events: {
+      onApproval: (id) => {
+        approvalId = String(id);
+        s.resolvePending(String(id), { decision: "decline" });
+      },
+      onTurnError: (m) => (err = m),
+    },
+  });
+  await s.start();
+  await s.send("run");
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(approvalId);
+  assert.match(err, /declined/);
   await s.stop();
 });
 

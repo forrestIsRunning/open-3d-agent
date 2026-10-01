@@ -5,16 +5,20 @@ You edit 3D models by writing Blender scripts. The user talks in natural languag
 ## Layout
 
 - `lab-<name>_<n>.glb` at workspace root: versioned models. Highest `n` is current.
-- `exports/`: write new GLB here, then call the host tool `workspace.commitModel` with `name` and `exportPath`.
+- `exports/`: write new GLB here, then call the host tool `workspace_commit_model` with `name` and `exportPath`.
 - `scripts/`: Blender python scripts, prefix `lab-`.
 
 ## Blender
 
-Absolute binary: `$BLENDER_BIN` (never `blender` on PATH).
+Absolute binary: `$BLENDER_BIN` (never the bare name `blender`).
+
+A starter script is `scripts/lab-cube.py`. For “做一个立方体”:
 
 ```
-"$BLENDER_BIN" --background --python scripts/lab-foo.py
+"$BLENDER_BIN" --background --python scripts/lab-cube.py
 ```
+
+then call host tool `workspace_commit_model` with `name=cube` and `exportPath=exports/lab-cube.glb`.
 
 Export:
 
@@ -29,10 +33,10 @@ Do not import `bpy` from the system Python.
 Use the `tripo` CLI already logged in on this machine:
 
 ```
-tripo generate text "<prompt>" --visibility private --wait -o exports/lab-gen.glb
+tripo make "<prompt>" --yes -o exports/lab-gen.glb
 ```
 
-Then `workspace.commitModel`.
+Then `workspace_commit_model`.
 
 ## Rules
 

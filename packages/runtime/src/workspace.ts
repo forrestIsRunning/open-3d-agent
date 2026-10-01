@@ -6,13 +6,20 @@ const here = dirname(fileURLToPath(import.meta.url));
 export const repoRoot = resolve(here, "../../..");
 export const templatesRoot = join(repoRoot, "templates");
 
-export function seedWorkspace(workspace: string): void {
+export function seedWorkspace(workspace: string, blenderBin?: string): void {
   mkdirSync(workspace, { recursive: true });
   mkdirSync(join(workspace, "scripts"), { recursive: true });
   mkdirSync(join(workspace, "exports"), { recursive: true });
   mkdirSync(join(workspace, ".lab"), { recursive: true });
-  copyTree(join(templatesRoot, "AGENTS.md"), join(workspace, "AGENTS.md"));
+  let agents = readFileSync(join(templatesRoot, "AGENTS.md"), "utf8");
+  if (blenderBin) {
+    agents = agents.replaceAll("$BLENDER_BIN", blenderBin).replaceAll("`blender` on PATH", blenderBin);
+    agents = agents.split("Absolute binary: `$BLENDER_BIN`").join(`Absolute binary: \`${blenderBin}\``);
+  }
+  writeFileSync(join(workspace, "AGENTS.md"), agents);
   copyTree(join(templatesRoot, "skills"), join(workspace, "skills"));
+  const cube = join(templatesRoot, "scripts/lab-cube.py");
+  if (existsSync(cube)) copyTree(cube, join(workspace, "scripts/lab-cube.py"));
 }
 
 function copyTree(src: string, dest: string): void {

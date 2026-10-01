@@ -17,15 +17,20 @@ protocol.registerSchemesAsPrivileged([
 
 let win: BrowserWindow | null = null;
 let host: ChildProcessWithoutNullStreams | null = null;
-let sessionReady: Promise<{ workspace: string }> | null = null;
+let sessionReady: Promise<{
+  workspace: string;
+  fake: boolean;
+  model?: string;
+  approvalPolicy?: string;
+}> | null = null;
 let nextId = 1;
-const pending = new Map<number, (v: unknown) => void>();
+const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
 
 function sendHost(method: string, params: unknown): Promise<unknown> {
   if (!host?.stdin.writable) throw new Error("host not running");
   const id = nextId++;
   host.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
-  return new Promise((resolve) => pending.set(id, resolve));
+  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
 }
 
 function startHost(): void {
@@ -47,10 +52,18 @@ function startHost(): void {
   const rl = createInterface({ input: host.stdout });
   rl.on("line", (line) => {
     try {
-      const msg = JSON.parse(line) as { id?: number; method?: string; result?: unknown; params?: unknown };
+      const msg = JSON.parse(line) as {
+        id?: number;
+        method?: string;
+        result?: unknown;
+        params?: unknown;
+        error?: { message?: string };
+      };
       if (msg.id != null && pending.has(msg.id)) {
-        pending.get(msg.id)!(msg.result);
+        const p = pending.get(msg.id)!;
         pending.delete(msg.id);
+        if (msg.error) p.reject(new Error(msg.error.message ?? "host error"));
+        else p.resolve(msg.result);
         return;
       }
       if (msg.method) win?.webContents.send("runtime-event", { method: msg.method, params: msg.params });
@@ -89,8 +102,15 @@ app.whenReady().then(async () => {
     if (!sessionReady) {
       sessionReady = (async () => {
         await sendHost(EnvelopeMethod.workspaceOpen, { path: workspace });
-        await sendHost(EnvelopeMethod.runtimeStart, { fake: process.env.LAB_FAKE === "1" });
-        return { workspace };
+        const started = (await sendHost(EnvelopeMethod.runtimeStart, {
+          fake: process.env.LAB_FAKE === "1",
+        })) as { fake?: boolean; model?: string; approvalPolicy?: string };
+        return {
+          workspace,
+          fake: Boolean(started.fake),
+          model: started.model,
+          approvalPolicy: started.approvalPolicy,
+        };
       })();
     }
     return sessionReady;
@@ -98,6 +118,10 @@ app.whenReady().then(async () => {
   ipcMain.handle("lab:send", async (_e, text: string) => sendHost(EnvelopeMethod.turnSend, { text }));
   ipcMain.handle("lab:approve", async (_e, payload: { id: string; result: unknown }) =>
     sendHost(EnvelopeMethod.approvalRespond, payload),
+  );
+  ipcMain.handle("lab:runCube", async () => sendHost(EnvelopeMethod.runCube, {}));
+  ipcMain.handle("lab:runTripo", async (_e, prompt?: string) =>
+    sendHost(EnvelopeMethod.runTripo, { prompt: prompt ?? "a cute low poly fox" }),
   );
   ipcMain.handle("lab:stop", async () => sendHost(EnvelopeMethod.runtimeStop, {}));
   await createWindow();

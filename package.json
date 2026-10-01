@@ -14,7 +14,11 @@
     "test": "pnpm --filter @lab3d/runtime test",
     "lab": "pnpm --filter @lab3d/runtime lab",
     "lab:fake": "pnpm --filter @lab3d/runtime lab:fake",
-    "doctor": "pnpm --filter @lab3d/runtime doctor",
-    "dev": "pnpm --filter @lab3d/desktop dev"
+    "lab-doctor": "pnpm --filter @lab3d/runtime run doctor",
+    "e2e:cube": "pnpm --filter @lab3d/runtime e2e:cube",
+    "e2e:tripo": "pnpm --filter @lab3d/runtime e2e:tripo",
+    "electron:install": "node scripts/install-electron.mjs",
+    "dev": "pnpm --filter @lab3d/desktop dev",
+    "dev:fake": "LAB_FAKE=1 pnpm --filter @lab3d/desktop dev"
   }
 }

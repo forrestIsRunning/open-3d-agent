@@ -1,56 +1,35 @@
 # desktop-3d-agent
 
-Local learning app: **Codex app-server harness + Blender/Tripo + Electron 3D viewer**.
+Local learning app: **Codex app-server + Blender/Tripo + Electron 3D viewer**.
 
-Pinned Codex CLI: see `CODEX_VERSION` (currently 0.158.0).
+Pinned Codex CLI: `CODEX_VERSION` (0.158.0).
 
-Not a Hi3D clone. Private repo for studying stdio JSON-RPC.
+**Default `pnpm dev` talks to a real `codex app-server`.**  
+Fake mode is explicit: `pnpm dev:fake` / `LAB_FAKE=1`. The window shows a red **FAKE** badge.
 
 ## Setup
 
 ```bash
-cp .env.example .env
-# fill OPENAI_API_KEY if you want a real model
+cp .env.example .env   # fill OPENAI_API_KEY + OPENAI_BASE_URL + MODEL
 pnpm install
-pnpm doctor
+pnpm electron:install  # if Electron dist is incomplete; uses https_proxy
+pnpm lab-doctor
 ```
 
-## Fake Codex (no API)
+Electron download honors `https_proxy` / `http_proxy`. Do **not** set `ALL_PROXY=socks5://…` for this installer.
+
+## Commands
 
 ```bash
+pnpm test              # fake app-server
 pnpm lab:fake -- --prompt "列出文件"
-# inspect tmp-ws/.lab/rpc.jsonl
-pnpm test
+pnpm lab -- --prompt "介绍一下自己" --timeout 90
+pnpm e2e:cube          # Blender, no LLM
+pnpm e2e:tripo         # tripo CLI, needs login
+pnpm dev               # LIVE desktop
+pnpm dev:fake          # FAKE desktop
 ```
 
-## Real Codex
+Desktop buttons **Blender cube** / **Tripo fox** run the hard paths (no model required). Chat uses Codex.
 
-Needs `codex` 0.158.0 on PATH and `.env`.
-
-```bash
-pnpm lab -- --prompt "列出这个目录里的文件"
-```
-
-## Desktop
-
-```bash
-pnpm dev                 # real app-server
-LAB_FAKE=1 pnpm dev      # fake server
-```
-
-Left: chat. Right: Three.js. After `workspace.commitModel`, the latest `lab-*.glb` loads.
-
-## Protocol
-
-- `docs/protocol.md`
-- `docs/learn-path.md`
-- `pnpm proto:gen` regenerates `packages/protocol/{schema,generated}` from the local CLI
-
-## Layout
-
-```
-packages/protocol   generated types + method constants
-packages/runtime    JSON-RPC client, fake server, lab, host envelope
-apps/desktop        Electron + Vue + Three.js
-templates           AGENTS.md + blender/tripo skills
-```
+Protocol traces: `~/3d-agent-workspaces/default/.lab/rpc.jsonl` or `tmp-ws/.lab/rpc.jsonl`.
