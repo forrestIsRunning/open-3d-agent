@@ -28,23 +28,34 @@ function sendHost(method: string, params: unknown): Promise<unknown> {
 }
 
 function startHost(): void {
-  const tsx = join(repoRoot, "node_modules/.bin/tsx");
+  const tsxCli = join(repoRoot, "packages/runtime/node_modules/tsx/dist/cli.mjs");
   const hostFile = join(repoRoot, "packages/runtime/src/host.ts");
-  host = spawn(tsx, [hostFile], {
+  host = spawn(process.execPath, [tsxCli, hostFile], {
     cwd: repoRoot,
-    env: process.env,
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      LAB_FAKE: process.env.LAB_FAKE ?? "",
+    },
     stdio: ["pipe", "pipe", "pipe"],
+  });
+  host.on("error", (err) => {
+    process.stderr.write(`host spawn error: ${err.message}\n`);
   });
   host.stderr.on("data", (c) => process.stderr.write(c));
   const rl = createInterface({ input: host.stdout });
   rl.on("line", (line) => {
-    const msg = JSON.parse(line) as { id?: number; method?: string; result?: unknown; params?: unknown };
-    if (msg.id != null && pending.has(msg.id)) {
-      pending.get(msg.id)!(msg.result);
-      pending.delete(msg.id);
-      return;
+    try {
+      const msg = JSON.parse(line) as { id?: number; method?: string; result?: unknown; params?: unknown };
+      if (msg.id != null && pending.has(msg.id)) {
+        pending.get(msg.id)!(msg.result);
+        pending.delete(msg.id);
+        return;
+      }
+      if (msg.method) win?.webContents.send("runtime-event", { method: msg.method, params: msg.params });
+    } catch (err) {
+      process.stderr.write(`host line: ${line}\n`);
     }
-    if (msg.method) win?.webContents.send("runtime-event", { method: msg.method, params: msg.params });
   });
 }
 
