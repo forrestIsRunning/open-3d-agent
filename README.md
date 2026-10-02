@@ -3,8 +3,16 @@
 Chat on the left. A live GLB stage on the right. You talk; the **host** builds the mesh (Tripo or headless Blender). The LLM only comments — it never launches Blender.
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Open 3D Agent: fox on the stage, version filmstrip below" width="920" />
+  <img src="assets/screenshot.png" alt="Open 3D Agent: husky on the live stage after a fur-color edit" width="920" />
 </p>
+
+<p align="center">
+  <img src="assets/husky-v1.png" alt="husky v1 classic coat" width="280" />
+  &nbsp;
+  <img src="assets/husky-v2.png" alt="husky v2 golden-red coat" width="280" />
+</p>
+
+<p align="center"><sub>Same family: <code>generate a Siberian husky</code> → <code>change the fur to golden-red</code> → <code>husky · v2</code></sub></p>
 
 ## How it works
 
