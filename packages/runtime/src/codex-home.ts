@@ -35,7 +35,7 @@ model_provider = "${cfg.provider}"
 name = "${cfg.provider}"
 base_url = "${cfg.baseUrl}"
 env_key = "OPENAI_API_KEY"
-wire_api = "responses"
+wire_api = "chat"
 `;
   writeFileSync(join(cfg.codexHome, "config.toml"), toml);
   if (!existsSync(join(cfg.codexHome, "auth.json")) && cfg.apiKey) {
