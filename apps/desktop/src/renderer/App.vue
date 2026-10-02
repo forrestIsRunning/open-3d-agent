@@ -200,7 +200,7 @@ async function refreshAssets(): Promise<void> {
 }
 
 async function snapshotThumb(name: string): Promise<void> {
-  const url = captureProductPng() || (await captureAfterPaint());
+  const url = capturePng() || (await captureAfterPaint());
   if (!url) return;
   thumbs.value[name] = url;
   const b64 = url.replace(/^data:image\/png;base64,/, "");

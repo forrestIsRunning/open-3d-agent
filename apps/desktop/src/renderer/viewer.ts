@@ -194,28 +194,35 @@ export function isCompareOn(): boolean {
 }
 
 export function capturePng(): string {
-  return captureProductPng();
+  return captureFrame({ product: false });
 }
 
 export function captureProductPng(): string {
+  return captureFrame({ product: true });
+}
+
+function captureFrame(opts: { product: boolean }): string {
   if (!renderer || !scene || !camera) return "";
   const gridWas = grid?.visible ?? false;
   const boxWas = selectedBox?.visible ?? false;
   const prevWas = previous?.visible ?? false;
   const bg = scene.background;
-  const floor = ground?.material as THREE.ShadowMaterial | THREE.MeshStandardMaterial | undefined;
+  const floor = ground?.material as THREE.Material | undefined;
   if (grid) grid.visible = false;
   if (selectedBox) selectedBox.visible = false;
   if (previous) previous.visible = false;
-  scene.background = shotBg;
-  if (ground) {
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xd0d4dc,
-      roughness: 0.9,
-      metalness: 0,
-    });
-    ground.material = mat;
-    ground.receiveShadow = true;
+  if (opts.product) {
+    scene.background = shotBg;
+    if (ground) {
+      ground.material = new THREE.MeshStandardMaterial({
+        color: 0xd0d4dc,
+        roughness: 0.9,
+        metalness: 0,
+      });
+      ground.receiveShadow = true;
+    }
+  } else {
+    scene.background = viewBg;
   }
   renderer.render(scene, camera);
   const url = renderer.domElement.toDataURL("image/png");
