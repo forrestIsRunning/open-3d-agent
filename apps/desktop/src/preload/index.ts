@@ -11,6 +11,10 @@ contextBridge.exposeInMainWorld("lab", {
   runTripo: (prompt?: string) => ipcRenderer.invoke("lab:runTripo", prompt),
   generate: (prompt: string, name: string) => ipcRenderer.invoke("lab:generate", { prompt, name }),
   listAssets: () => ipcRenderer.invoke("lab:listAssets"),
+  saveImage: (name: string, b64: string) => ipcRenderer.invoke("lab:saveImage", name, b64),
+  readImage: (name: string) => ipcRenderer.invoke("lab:readImage", name),
+  saveShot: (b64: string) => ipcRenderer.invoke("lab:saveShot", b64),
+  deleteAsset: (name: string) => ipcRenderer.invoke("lab:deleteAsset", name),
   stop: () => ipcRenderer.invoke("lab:stop"),
   onEvent: (cb: (ev: { method: string; params: unknown }) => void) => {
     const fn = (_: unknown, ev: { method: string; params: unknown }) => cb(ev);

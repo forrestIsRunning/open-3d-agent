@@ -21,6 +21,10 @@ declare global {
       runTripo: (prompt?: string) => Promise<{ path?: string }>;
       generate: (prompt: string, name: string) => Promise<{ path?: string }>;
       listAssets: () => Promise<{ names: string[] }>;
+      saveImage: (name: string, b64: string) => Promise<{ path?: string }>;
+      readImage: (name: string) => Promise<{ b64?: string }>;
+      saveShot: (b64: string) => Promise<{ name: string; path: string }>;
+      deleteAsset: (name: string) => Promise<unknown>;
       stop: () => Promise<unknown>;
       onEvent: (cb: (ev: { method: string; params: unknown }) => void) => () => void;
     };

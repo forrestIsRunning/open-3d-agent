@@ -1,12 +1,27 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { classifyIntent } from "@lab3d/protocol";
-import { mountViewer, loadGlbBuffer } from "./viewer.ts";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { classifyIntent, parseAssetName } from "@lab3d/protocol";
+import {
+  captureAfterPaint,
+  capturePng,
+  focusSelected,
+  loadGlbBuffer,
+  mountViewer,
+  selectedName,
+  setCompare,
+  setLightPreset,
+  setSelectHandler,
+} from "./viewer.ts";
 
 type Msg = { role: "user" | "agent" | "tool" | "system"; text: string };
 
 const messages = ref<Msg[]>([]);
-const input = ref("介绍一下自己");
+const input = ref("");
+const thumbs = ref<Record<string, string>>({});
+const lights = ref<"studio" | "soft" | "rim">("studio");
+const compare = ref(false);
+const pickHint = ref("");
+const stageTitle = computed(() => (assetName.value ? parseAssetName(assetName.value).label : "空舞台"));
 const ready = ref(false);
 const busy = ref(false);
 const fake = ref<boolean | null>(null);
@@ -39,6 +54,9 @@ onMounted(async () => {
     viewRef.value = el;
     mountViewer(el);
   }
+  setSelectHandler((n) => {
+    pickHint.value = n;
+  });
   unsub = window.lab.onEvent((ev) => {
     if (ev.method === "agent.text") {
       waiting.value = false;
@@ -91,24 +109,32 @@ onMounted(async () => {
 
 onUnmounted(() => unsub?.());
 
+function stageContext(): string {
+  const title = assetName.value ? parseAssetName(assetName.value).label : "空舞台";
+  const sel = selectedName();
+  const pick = sel ? `；选中 ${sel}` : "";
+  return `当前舞台：${title}${assetName.value ? `（${assetName.value}）` : ""}${pick}`;
+}
+
 async function send(): Promise<void> {
   const text = input.value.trim();
   if (!text) return;
   messages.value.push({ role: "user", text });
   input.value = "";
   const intent = classifyIntent(text);
+  const wrapped = `${stageContext()}\n用户：${text}`;
   try {
     if (intent.kind === "blender-cube") await cube();
     else if (intent.kind === "blender-lamb") await lamb();
     else if (intent.kind === "generate") await generate(intent.prompt, intent.name);
     else {
       waiting.value = true;
-      await window.lab.send(text);
+      await window.lab.send(wrapped);
     }
     if (intent.kind !== "chat") {
       waiting.value = true;
       await window.lab.send(
-        `[host] 已在宿主侧处理「${text}」。不要执行 Blender.app 或 tripo。用一两句话回复用户。`,
+        `${stageContext()}\n[host] 已处理「${text}」。不要执行 Blender.app 或 tripo。用一两句话对着当前舞台回复。`,
       );
     }
   } catch (err) {
@@ -123,17 +149,33 @@ async function decide(allow: boolean): Promise<void> {
   approval.value = null;
 }
 
+async function loadThumb(name: string): Promise<void> {
+  if (thumbs.value[name]) return;
+  const img = await window.lab.readImage(name);
+  if (img.b64) thumbs.value[name] = `data:image/png;base64,${img.b64}`;
+}
+
 async function refreshAssets(): Promise<void> {
   try {
     const r = await window.lab.listAssets();
     assets.value = r.names ?? [];
+    await Promise.all(assets.value.map((n) => loadThumb(n)));
   } catch {
     assets.value = [];
   }
 }
 
+async function snapshotThumb(name: string): Promise<void> {
+  const url = await captureAfterPaint();
+  if (!url) return;
+  thumbs.value[name] = url;
+  const b64 = url.replace(/^data:image\/png;base64,/, "");
+  await window.lab.saveImage(name.replace(/\.glb$/i, ".png"), b64);
+}
+
 async function showModel(name: string, notify = true): Promise<void> {
-  if (!name || name === lastModel) {
+  if (!name) return;
+  if (name === lastModel) {
     assetName.value = name;
     return;
   }
@@ -147,12 +189,51 @@ async function showModel(name: string, notify = true): Promise<void> {
     for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
     await loadGlbBuffer(bytes);
     assetName.value = name;
+    pickHint.value = "";
     await refreshAssets();
-    if (notify) messages.value.push({ role: "system", text: `已载入 ${name}` });
+    await snapshotThumb(name);
+    if (notify) messages.value.push({ role: "system", text: `舞台：${parseAssetName(name).label}` });
   } catch (err) {
     lastModel = "";
     messages.value.push({ role: "system", text: `加载失败 ${name}: ${String(err)}` });
   }
+}
+
+function applyLights(): void {
+  setLightPreset(lights.value);
+}
+
+function toggleCompare(): void {
+  compare.value = !compare.value;
+  setCompare(compare.value);
+}
+
+function onFocus(): void {
+  focusSelected();
+  pickHint.value = selectedName() || "整体";
+}
+
+async function sendShot(): Promise<void> {
+  const url = capturePng();
+  if (!url) return;
+  const b64 = url.replace(/^data:image\/png;base64,/, "");
+  const shot = await window.lab.saveShot(b64);
+  messages.value.push({ role: "user", text: `视窗截图 ${shot.name}` });
+  waiting.value = true;
+  await window.lab.send(
+    `${stageContext()}\n用户发送了当前视窗截图，已保存 ${shot.path}。请根据当前舞台模型简短回应，不要开 Blender。`,
+  );
+}
+
+async function removeAsset(name: string, ev: Event): Promise<void> {
+  ev.stopPropagation();
+  await window.lab.deleteAsset(name);
+  if (assetName.value === name) {
+    lastModel = "";
+    assetName.value = "";
+  }
+  delete thumbs.value[name];
+  await refreshAssets();
 }
 
 async function cube(): Promise<void> {
@@ -219,6 +300,7 @@ async function generate(prompt: string, name: string): Promise<void> {
       <div class="chips">
         <span class="chip" v-if="model">{{ model }}</span>
         <span class="chip">{{ policy || "never" }}</span>
+        <span class="chip on">{{ stageTitle }}</span>
       </div>
       <div v-if="jobs.length" class="jobs">
         <div v-for="j in jobs" :key="j.id" class="job" :class="j.status">{{ j.label }} · {{ j.status }}</div>
@@ -251,27 +333,42 @@ async function generate(prompt: string, name: string): Promise<void> {
           <button :disabled="!ready || busy" @click="fox">Tripo 狐狸</button>
         </div>
         <form @submit.prevent="send">
-          <input v-model="input" :disabled="!ready" placeholder="给模型发一句…" />
+          <input v-model="input" :disabled="!ready" :placeholder="`对着 ${stageTitle} 说…`" />
           <button class="send" :disabled="!ready">发送</button>
         </form>
       </div>
     </aside>
 
     <main class="stage-wrap">
+      <div class="tools">
+        <button type="button" @click="onFocus">聚焦</button>
+        <button type="button" @click="sendShot">截图回灌</button>
+        <select v-model="lights" @change="applyLights">
+          <option value="studio">灯光 · 摄影棚</option>
+          <option value="soft">灯光 · 柔和</option>
+          <option value="rim">灯光 · 轮廓</option>
+        </select>
+        <button type="button" :class="{ on: compare }" @click="toggleCompare">对比上一版</button>
+      </div>
       <div class="stage" ref="viewRef"></div>
       <div v-if="busy" class="veil">生成中…</div>
-      <div class="assets">
+      <div class="film">
         <button
           v-for="n in assets"
           :key="n"
+          class="card"
           :class="{ on: n === assetName }"
           @click="showModel(n, false)"
         >
-          {{ n }}
+          <img v-if="thumbs[n]" :src="thumbs[n]" alt="" />
+          <span class="ph" v-else />
+          <em>{{ parseAssetName(n).label }}</em>
+          <i @click="removeAsset(n, $event)">×</i>
         </button>
       </div>
       <div class="hud">
-        <span>{{ assetName || "视窗" }}</span>
+        <span>{{ stageTitle }}</span>
+        <span v-if="pickHint">选中 {{ pickHint }}</span>
         <span v-if="busy">导出中…</span>
         <span v-else-if="waiting">模型思考中…</span>
         <span class="path" :title="workspace">{{ workspace }}</span>
@@ -346,6 +443,7 @@ async function generate(prompt: string, name: string): Promise<void> {
   border-radius: 999px;
   padding: 2px 8px;
 }
+.chip.on { color: var(--accent); border-color: #7a4e28; }
 .log {
   flex: 1;
   overflow: auto;
@@ -418,29 +516,63 @@ form input:focus { border-color: #5b6b88; }
 .job.ok { color: var(--live); }
 .job.fail { color: var(--fake); }
 .stage-wrap { position: relative; min-width: 0; min-height: 0; }
-.stage { position: absolute; inset: 0 0 44px 0; background: #0e1116; }
+.tools {
+  position: absolute; top: 10px; left: 12px; z-index: 2;
+  display: flex; gap: 6px; pointer-events: auto;
+}
+.tools select, .tools button {
+  font-size: 11px;
+  padding: 5px 8px;
+  background: rgba(16,20,28,0.82);
+}
+.tools button.on { border-color: var(--accent); color: var(--accent); }
+.stage { position: absolute; inset: 36px 0 108px 0; background: #0e1116; }
 .veil {
-  position: absolute; inset: 0 0 44px 0;
+  position: absolute; inset: 36px 0 108px 0;
   display: grid; place-items: center;
   background: rgba(8,10,14,0.45);
   pointer-events: none;
 }
-.assets {
+.film {
   position: absolute; left: 0; right: 0; bottom: 40px;
-  display: flex; gap: 6px; overflow: auto;
+  display: flex; gap: 8px; overflow-x: auto;
   padding: 0 12px 8px;
 }
-.assets button {
-  font-size: 10px;
-  padding: 4px 8px;
-  white-space: nowrap;
+.card {
+  position: relative;
+  width: 92px;
+  padding: 0;
+  overflow: hidden;
+  flex: 0 0 auto;
+  background: #12161e;
 }
-.assets button.on { border-color: var(--accent); color: var(--accent); }
+.card img, .card .ph {
+  display: block;
+  width: 92px;
+  height: 64px;
+  object-fit: cover;
+  background: #1a2030;
+}
+.card em {
+  display: block;
+  font-style: normal;
+  font-size: 10px;
+  padding: 4px 6px 6px;
+}
+.card i {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-style: normal;
+  color: #ccc;
+  cursor: pointer;
+}
+.card.on { border-color: var(--accent); }
 .hud {
   position: absolute;
   left: 12px;
   right: 12px;
-  bottom: 12px;
+  bottom: 8px;
   display: flex;
   gap: 12px;
   align-items: center;

@@ -3,7 +3,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createInterface } from "node:readline";
-import { mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { EnvelopeMethod } from "@lab3d/protocol";
 
@@ -154,6 +154,38 @@ app.whenReady().then(async () => {
     sendHost(EnvelopeMethod.generate3d, payload),
   );
   ipcMain.handle("lab:listAssets", async () => sendHost(EnvelopeMethod.listAssets, {}));
+  ipcMain.handle("lab:saveImage", async (_e, rel: string, b64: string) => {
+    const name = String(rel).replace(/^.*\//, "");
+    if (!/^[\w.-]+\.png$/.test(name)) throw new Error("bad image name");
+    const dir = join(workspace, ".lab/thumbs");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, name);
+    writeFileSync(file, Buffer.from(b64, "base64"));
+    return { path: file };
+  });
+  ipcMain.handle("lab:readImage", async (_e, name: string) => {
+    const base = String(name).replace(/^.*\//, "").replace(/\.glb$/i, ".png");
+    const file = join(workspace, ".lab/thumbs", base);
+    if (!existsSync(file)) return {};
+    return { b64: readFileSync(file).toString("base64") };
+  });
+  ipcMain.handle("lab:saveShot", async (_e, b64: string) => {
+    const dir = join(workspace, ".lab/shots");
+    mkdirSync(dir, { recursive: true });
+    const name = `shot-${Date.now()}.png`;
+    const file = join(dir, name);
+    writeFileSync(file, Buffer.from(b64, "base64"));
+    return { name, path: file };
+  });
+  ipcMain.handle("lab:deleteAsset", async (_e, name: string) => {
+    const base = String(name).replace(/^.*\//, "");
+    if (!/^lab-[\w-]+_\d+\.glb$/i.test(base)) throw new Error("bad model name");
+    const file = join(workspace, base);
+    if (existsSync(file)) unlinkSync(file);
+    const thumb = join(workspace, ".lab/thumbs", base.replace(/\.glb$/i, ".png"));
+    if (existsSync(thumb)) unlinkSync(thumb);
+    return {};
+  });
   ipcMain.handle("lab:stop", async () => sendHost(EnvelopeMethod.runtimeStop, {}));
   await createWindow();
 });

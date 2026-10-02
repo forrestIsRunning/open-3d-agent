@@ -7,23 +7,36 @@ let scene: THREE.Scene | null = null;
 let camera: THREE.PerspectiveCamera | null = null;
 let controls: OrbitControls | null = null;
 let current: THREE.Object3D | null = null;
-let placeholder: THREE.Object3D | null = null;
+let previous: THREE.Object3D | null = null;
+let selected: THREE.Object3D | null = null;
+let selectedBox: THREE.BoxHelper | null = null;
+let ambient: THREE.AmbientLight | null = null;
+let keyLight: THREE.DirectionalLight | null = null;
+let fillLight: THREE.DirectionalLight | null = null;
+let hostEl: HTMLElement | null = null;
+let compareOn = false;
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let selectCb: ((name: string) => void) | null = null;
+
+export function setSelectHandler(fn: (name: string) => void): void {
+  selectCb = fn;
+}
 
 export function mountViewer(el: HTMLElement): void {
+  hostEl = el;
   if (renderer) {
-    if (renderer.domElement.parentElement !== el) {
-      el.appendChild(renderer.domElement);
-    }
+    if (renderer.domElement.parentElement !== el) el.appendChild(renderer.domElement);
     resize(el);
     return;
   }
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1d23);
+  scene.background = new THREE.Color(0x0e1116);
   camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
   camera.position.set(2.4, 1.8, 2.4);
-  camera.lookAt(0, 0, 0);
-  renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setPixelRatio(window.devicePixelRatio);
+  camera.lookAt(0, 0.4, 0);
+  renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.domElement.style.display = "block";
   renderer.domElement.style.width = "100%";
   renderer.domElement.style.height = "100%";
@@ -31,21 +44,15 @@ export function mountViewer(el: HTMLElement): void {
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-  const dir = new THREE.DirectionalLight(0xffffff, 0.9);
-  dir.position.set(3, 5, 2);
-  scene.add(dir);
-  scene.add(new THREE.GridHelper(6, 12, 0x6a7380, 0x3a414c));
-  scene.add(new THREE.AxesHelper(1.2));
+  ambient = new THREE.AmbientLight(0xffffff, 0.55);
+  keyLight = new THREE.DirectionalLight(0xffffff, 1.05);
+  keyLight.position.set(3, 5, 2);
+  fillLight = new THREE.DirectionalLight(0x88a0c0, 0.35);
+  fillLight.position.set(-4, 1.5, -2);
+  scene.add(ambient, keyLight, fillLight);
+  scene.add(new THREE.GridHelper(8, 16, 0x3d4654, 0x252b36));
 
-  const cube = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    new THREE.MeshStandardMaterial({ color: 0x5b8def, roughness: 0.4, metalness: 0.1 }),
-  );
-  cube.position.y = 0.5;
-  placeholder = cube;
-  scene.add(cube);
-
+  renderer.domElement.addEventListener("pointerdown", onPointerDown);
   const loop = () => {
     controls!.update();
     renderer!.render(scene!, camera!);
@@ -53,8 +60,7 @@ export function mountViewer(el: HTMLElement): void {
   };
   loop();
   resize(el);
-  const ro = new ResizeObserver(() => resize(el));
-  ro.observe(el);
+  new ResizeObserver(() => resize(el)).observe(el);
 }
 
 function resize(el: HTMLElement): void {
@@ -78,36 +84,121 @@ export async function whenViewerMounted(timeoutMs = 8000): Promise<void> {
   }
 }
 
+function frameObject(obj: THREE.Object3D): void {
+  if (!camera || !controls) return;
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = box.getSize(new THREE.Vector3()).length() || 1;
+  const center = box.getCenter(new THREE.Vector3());
+  camera.near = Math.max(size / 200, 0.01);
+  camera.far = Math.max(size * 20, 50);
+  camera.position.copy(center).add(new THREE.Vector3(size * 0.7, size * 0.5, size * 0.7));
+  camera.lookAt(center);
+  camera.updateProjectionMatrix();
+  controls.target.copy(center);
+  controls.update();
+}
+
+function clearSelected(): void {
+  if (selectedBox && scene) scene.remove(selectedBox);
+  selectedBox = null;
+  selected = null;
+}
+
+function markSelected(obj: THREE.Object3D): void {
+  clearSelected();
+  selected = obj;
+  selectedBox = new THREE.BoxHelper(obj, 0xf4a261);
+  scene?.add(selectedBox);
+}
+
+function onPointerDown(ev: PointerEvent): void {
+  if (!renderer || !camera || !current) return;
+  if (ev.button !== 0) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObject(current, true);
+  if (hits[0]) {
+    markSelected(hits[0].object);
+    selectCb?.(selectedName());
+  }
+}
+
+export function selectedName(): string {
+  return selected?.name || (selected as THREE.Mesh | null)?.type || "";
+}
+
+export function focusSelected(): void {
+  if (selected) frameObject(selected);
+  else if (current) frameObject(current);
+}
+
+export function setLightPreset(kind: "studio" | "soft" | "rim"): void {
+  if (!ambient || !keyLight || !fillLight) return;
+  if (kind === "studio") {
+    ambient.intensity = 0.55;
+    keyLight.intensity = 1.05;
+    keyLight.position.set(3, 5, 2);
+    fillLight.intensity = 0.35;
+  } else if (kind === "soft") {
+    ambient.intensity = 0.95;
+    keyLight.intensity = 0.45;
+    fillLight.intensity = 0.4;
+  } else {
+    ambient.intensity = 0.2;
+    keyLight.intensity = 0.35;
+    keyLight.position.set(-2, 4, -3);
+    fillLight.intensity = 1.2;
+    fillLight.position.set(4, 2, 3);
+  }
+}
+
+export function setCompare(on: boolean): void {
+  compareOn = on;
+  if (previous) previous.visible = on;
+}
+
+export function isCompareOn(): boolean {
+  return compareOn;
+}
+
+export function capturePng(): string {
+  if (!renderer) return "";
+  renderer.render(scene!, camera!);
+  return renderer.domElement.toDataURL("image/png");
+}
+
 export async function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<void> {
   await whenViewerMounted();
   if (!scene || !camera) return Promise.reject(new Error("viewer not mounted"));
   const copy = data instanceof Uint8Array ? data.slice() : new Uint8Array(data);
-  const buf = copy.buffer;
   const loader = new GLTFLoader();
   return new Promise((resolve, reject) => {
     loader.parse(
-      buf as ArrayBuffer,
+      copy.buffer as ArrayBuffer,
       "",
       (gltf) => {
-        if (placeholder) {
-          scene!.remove(placeholder);
-          placeholder = null;
+        clearSelected();
+        if (previous && scene) scene.remove(previous);
+        if (current) {
+          previous = current;
+          previous.traverse((n) => {
+            const mesh = n as THREE.Mesh;
+            if (mesh.isMesh && mesh.material) {
+              const mat = (mesh.material as THREE.MeshStandardMaterial).clone();
+              mat.transparent = true;
+              mat.opacity = 0.28;
+              mat.color = new THREE.Color(0x88a0c8);
+              mesh.material = mat;
+            }
+          });
+          previous.visible = compareOn;
+          scene!.add(previous);
         }
-        if (current) scene!.remove(current);
         current = gltf.scene;
         scene!.add(current);
-        const box = new THREE.Box3().setFromObject(current);
-        const size = box.getSize(new THREE.Vector3()).length() || 1;
-        const center = box.getCenter(new THREE.Vector3());
-        camera!.near = Math.max(size / 200, 0.01);
-        camera!.far = Math.max(size * 20, 50);
-        camera!.position.copy(center).add(new THREE.Vector3(size * 0.7, size * 0.5, size * 0.7));
-        camera!.lookAt(center);
-        camera!.updateProjectionMatrix();
-        if (controls) {
-          controls.target.copy(center);
-          controls.update();
-        }
+        frameObject(current);
         resolve();
       },
       (err) => reject(err instanceof Error ? err : new Error(String(err))),
@@ -115,4 +206,12 @@ export async function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<voi
   });
 }
 
+export function captureAfterPaint(): Promise<string> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve(capturePng()));
+    });
+  });
+}
 
+void hostEl;
