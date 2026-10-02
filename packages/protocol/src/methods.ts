@@ -45,4 +45,7 @@ export const OptOutDeltas = [
 
 export const HostTool = {
   commitModel: "workspace_commit_model",
+  generate3d: "workspace_generate_3d",
+  runBlender: "workspace_run_blender",
+  listAssets: "workspace_list_assets",
 } as const;

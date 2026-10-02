@@ -187,6 +187,26 @@ test("commitModel increments versions", () => {
   assert.match(b, /lab-cube_2\.glb$/);
 });
 
+test("T-tool-generate stub tripo emits model.ready", async () => {
+  process.env.LAB_TRIPO_STUB = "1";
+  const ws = mkdtempSync(join(tmpdir(), "lab3d-"));
+  seedWorkspace(ws);
+  let ready = "";
+  const s = new AgentSession({
+    workspace: ws,
+    command: "tsx",
+    args: [fakeBin],
+    env: { ...process.env, FAKE_MODE: "generate-tool", LAB_TRIPO_STUB: "1" },
+    autoApprove: true,
+    events: { onModelReady: (p) => (ready = p) },
+  });
+  await s.start();
+  await s.send("puppy");
+  await new Promise((r) => setTimeout(r, 250));
+  assert.match(ready, /lab-puppy_1\.glb$/);
+  await s.stop();
+});
+
 test("T-optout OptOutDeltas exported", async () => {
   const { OptOutDeltas } = await import("@lab3d/protocol");
   assert.ok(OptOutDeltas.includes("item/agentMessage/delta"));

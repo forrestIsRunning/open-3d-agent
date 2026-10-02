@@ -150,6 +150,10 @@ app.whenReady().then(async () => {
   ipcMain.handle("lab:runTripo", async (_e, prompt?: string) =>
     sendHost(EnvelopeMethod.runTripo, { prompt: prompt ?? "a cute low poly fox" }),
   );
+  ipcMain.handle("lab:generate", async (_e, payload: { prompt: string; name: string }) =>
+    sendHost(EnvelopeMethod.generate3d, payload),
+  );
+  ipcMain.handle("lab:listAssets", async () => sendHost(EnvelopeMethod.listAssets, {}));
   ipcMain.handle("lab:stop", async () => sendHost(EnvelopeMethod.runtimeStop, {}));
   await createWindow();
 });

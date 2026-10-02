@@ -1,6 +1,9 @@
 import { ClientMethod, HostTool, ServerMethod, ServerNotify } from "@lab3d/protocol";
 import { AppServerClient, type JsonRpcId } from "./appserver-client.ts";
+import { listAssets } from "./assets.ts";
 import { commitModel } from "./commit-model.ts";
+import { runBlenderScript } from "./run-blender.ts";
+import { runTripo } from "./run-tripo.ts";
 
 export type SessionEvents = {
   onText?: (text: string) => void;
@@ -57,21 +60,7 @@ export class AgentSession {
       sandbox: this.opts.sandbox ?? "workspace-write",
       ephemeral: false,
       experimentalRawEvents: false,
-      dynamicTools: [
-        {
-          type: "function",
-          name: HostTool.commitModel,
-          description: "Register an exported GLB as the next lab-<name>_<n>.glb version.",
-          inputSchema: {
-            type: "object",
-            properties: {
-              name: { type: "string" },
-              exportPath: { type: "string" },
-            },
-            required: ["name", "exportPath"],
-          },
-        },
-      ],
+      dynamicTools: hostTools(),
     };
     if (this.opts.threadId) {
       try {
@@ -120,23 +109,25 @@ export class AgentSession {
 
   private async onServerRequest(id: JsonRpcId, method: string, params: unknown): Promise<unknown> {
     if (method === ServerMethod.toolCall) {
-      const p = params as { tool?: string; arguments?: { name?: string; exportPath?: string } };
-      if (p.tool === HostTool.commitModel) {
-        const dest = commitModel(
-          this.workspace,
-          p.arguments?.name ?? "model",
-          p.arguments?.exportPath ?? "",
-        );
-        this.opts.events?.onModelReady?.(dest);
+      const p = params as {
+        tool?: string;
+        arguments?: { name?: string; exportPath?: string; prompt?: string; script?: string };
+      };
+      try {
+        const dest = this.runHostTool(p.tool ?? "", p.arguments ?? {});
+        if (p.tool !== HostTool.listAssets && dest.endsWith(".glb")) {
+          this.opts.events?.onModelReady?.(dest);
+        }
         return {
           success: true,
-          contentItems: [{ type: "inputText", text: dest }],
+          contentItems: [{ type: "inputText", text: dest || "ok" }],
+        };
+      } catch (err) {
+        return {
+          success: false,
+          contentItems: [{ type: "inputText", text: err instanceof Error ? err.message : String(err) }],
         };
       }
-      return {
-        success: false,
-        contentItems: [{ type: "inputText", text: `unknown tool ${p.tool}` }],
-      };
     }
 
     if (
@@ -166,6 +157,25 @@ export class AgentSession {
     }
 
     return {};
+  }
+
+  private runHostTool(
+    tool: string,
+    args: { name?: string; exportPath?: string; prompt?: string; script?: string },
+  ): string {
+    if (tool === HostTool.commitModel) {
+      return commitModel(this.workspace, args.name ?? "model", args.exportPath ?? "");
+    }
+    if (tool === HostTool.generate3d) {
+      return runTripo(this.workspace, args.prompt ?? "a 3d model", args.name ?? "gen");
+    }
+    if (tool === HostTool.runBlender) {
+      return runBlenderScript(this.workspace, args.script ?? "lab-cube.py", args.name ?? "model");
+    }
+    if (tool === HostTool.listAssets) {
+      return listAssets(this.workspace).join("\n");
+    }
+    throw new Error(`unknown tool ${tool}`);
   }
 
   resolvePending(id: string, result: unknown): void {
@@ -204,5 +214,48 @@ export class AgentSession {
       }
     }
   }
+}
+
+function hostTools(): unknown[] {
+  return [
+    {
+      type: "function",
+      name: HostTool.generate3d,
+      description:
+        "Generate a GLB from a text prompt via the host Tripo CLI (proxy included). Never run Blender.app or tripo in the shell.",
+      inputSchema: {
+        type: "object",
+        properties: { prompt: { type: "string" }, name: { type: "string" } },
+        required: ["prompt", "name"],
+      },
+    },
+    {
+      type: "function",
+      name: HostTool.runBlender,
+      description:
+        "Run an existing scripts/lab-*.py with headless Blender. Forbidden: launching Blender.app GUI.",
+      inputSchema: {
+        type: "object",
+        properties: { script: { type: "string" }, name: { type: "string" } },
+        required: ["script", "name"],
+      },
+    },
+    {
+      type: "function",
+      name: HostTool.commitModel,
+      description: "Register an exported GLB as lab-<name>_<n>.glb.",
+      inputSchema: {
+        type: "object",
+        properties: { name: { type: "string" }, exportPath: { type: "string" } },
+        required: ["name", "exportPath"],
+      },
+    },
+    {
+      type: "function",
+      name: HostTool.listAssets,
+      description: "List committed lab-*_n.glb files in the workspace.",
+      inputSchema: { type: "object", properties: {} },
+    },
+  ];
 }
 

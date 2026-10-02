@@ -19,6 +19,8 @@ declare global {
       runCube: () => Promise<{ path?: string }>;
       runLamb: () => Promise<{ path?: string }>;
       runTripo: (prompt?: string) => Promise<{ path?: string }>;
+      generate: (prompt: string, name: string) => Promise<{ path?: string }>;
+      listAssets: () => Promise<{ names: string[] }>;
       stop: () => Promise<unknown>;
       onEvent: (cb: (ev: { method: string; params: unknown }) => void) => () => void;
     };

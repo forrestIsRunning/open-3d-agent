@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { classifyIntent } from "@lab3d/protocol";
 import { mountViewer, loadGlbBuffer } from "./viewer.ts";
 
 type Msg = { role: "user" | "agent" | "tool" | "system"; text: string };
@@ -14,6 +15,9 @@ const policy = ref("");
 const workspace = ref("");
 const assetName = ref("");
 const waiting = ref(false);
+const assets = ref<string[]>([]);
+const jobs = ref<{ id: number; label: string; status: string }[]>([]);
+let jobSeq = 1;
 const approval = ref<{ id: string; text: string } | null>(null);
 const viewRef = ref<HTMLElement | null>(null);
 let unsub: (() => void) | undefined;
@@ -41,7 +45,7 @@ onMounted(async () => {
       messages.value.push({ role: "agent", text: String((ev.params as { text: string }).text) });
     }
     if (ev.method === "agent.tool") {
-      messages.value.push({ role: "tool", text: JSON.stringify(ev.params) });
+      /* host jobs replace raw tool dumps */
     }
     if (ev.method === "turn.done") {
       waiting.value = false;
@@ -57,7 +61,7 @@ onMounted(async () => {
     if (ev.method === "model.ready") {
       const path = String((ev.params as { path: string }).path);
       const name = path.split("/").pop() ?? "";
-      void showModel(name);
+      void showModel(name, false);
     }
   });
   if (!opened) {
@@ -78,8 +82,9 @@ onMounted(async () => {
         text: `已连接 ${info.workspace} · thread ${info.threadId ?? "new"}`,
       });
     }
+    await refreshAssets();
     const latest = info.lastAsset || (await window.lab.latestModel()).name;
-    if (latest) await showModel(latest);
+    if (latest) await showModel(latest, false);
   }
   ready.value = true;
 });
@@ -91,16 +96,21 @@ async function send(): Promise<void> {
   if (!text) return;
   messages.value.push({ role: "user", text });
   input.value = "";
-  waiting.value = true;
-  const cubeTalk = /立方体|cube/i.test(text);
-  const lambTalk = /小羊|羔羊|lamb|sheep/i.test(text);
-  const foxTalk = /狐狸|fox/i.test(text);
+  const intent = classifyIntent(text);
   try {
-    const pending = [window.lab.send(text)];
-    if (cubeTalk) pending.push(cube());
-    else if (lambTalk) pending.push(lamb());
-    else if (foxTalk) pending.push(fox());
-    await Promise.all(pending);
+    if (intent.kind === "blender-cube") await cube();
+    else if (intent.kind === "blender-lamb") await lamb();
+    else if (intent.kind === "generate") await generate(intent.prompt, intent.name);
+    else {
+      waiting.value = true;
+      await window.lab.send(text);
+    }
+    if (intent.kind !== "chat") {
+      waiting.value = true;
+      await window.lab.send(
+        `[host] 已在宿主侧处理「${text}」。不要执行 Blender.app 或 tripo。用一两句话回复用户。`,
+      );
+    }
   } catch (err) {
     waiting.value = false;
     messages.value.push({ role: "system", text: String(err) });
@@ -113,8 +123,20 @@ async function decide(allow: boolean): Promise<void> {
   approval.value = null;
 }
 
-async function showModel(name: string): Promise<void> {
-  if (!name || name === lastModel) return;
+async function refreshAssets(): Promise<void> {
+  try {
+    const r = await window.lab.listAssets();
+    assets.value = r.names ?? [];
+  } catch {
+    assets.value = [];
+  }
+}
+
+async function showModel(name: string, notify = true): Promise<void> {
+  if (!name || name === lastModel) {
+    assetName.value = name;
+    return;
+  }
   lastModel = name;
   try {
     const el = viewRef.value ?? document.querySelector<HTMLElement>(".stage");
@@ -125,7 +147,8 @@ async function showModel(name: string): Promise<void> {
     for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
     await loadGlbBuffer(bytes);
     assetName.value = name;
-    messages.value.push({ role: "system", text: `已载入 ${name}` });
+    await refreshAssets();
+    if (notify) messages.value.push({ role: "system", text: `已载入 ${name}` });
   } catch (err) {
     lastModel = "";
     messages.value.push({ role: "system", text: `加载失败 ${name}: ${String(err)}` });
@@ -159,12 +182,20 @@ async function lamb(): Promise<void> {
 }
 
 async function fox(): Promise<void> {
+  await generate("a cute low poly fox", "fox");
+}
+
+async function generate(prompt: string, name: string): Promise<void> {
+  const job = { id: jobSeq++, label: `Tripo · ${name}`, status: "running" };
+  jobs.value.push(job);
   busy.value = true;
   try {
-    const r = await window.lab.runTripo("a cute low poly fox");
-    const name = r?.path?.split("/").pop();
-    if (name) await showModel(name);
+    const r = await window.lab.generate(prompt, name);
+    const file = r?.path?.split("/").pop();
+    job.status = "ok";
+    if (file) await showModel(file);
   } catch (err) {
+    job.status = "fail";
     messages.value.push({ role: "system", text: String(err) });
   } finally {
     busy.value = false;
@@ -189,9 +220,12 @@ async function fox(): Promise<void> {
         <span class="chip" v-if="model">{{ model }}</span>
         <span class="chip">{{ policy || "never" }}</span>
       </div>
+      <div v-if="jobs.length" class="jobs">
+        <div v-for="j in jobs" :key="j.id" class="job" :class="j.status">{{ j.label }} · {{ j.status }}</div>
+      </div>
 
       <div class="log">
-        <article v-for="(m, i) in messages" :key="i" class="msg" :class="m.role">
+        <article v-for="(m, i) in messages.filter((x) => x.role !== 'tool')" :key="i" class="msg" :class="m.role">
           <span class="who">{{ m.role }}</span>
           <p>{{ m.text }}</p>
         </article>
@@ -225,6 +259,17 @@ async function fox(): Promise<void> {
 
     <main class="stage-wrap">
       <div class="stage" ref="viewRef"></div>
+      <div v-if="busy" class="veil">生成中…</div>
+      <div class="assets">
+        <button
+          v-for="n in assets"
+          :key="n"
+          :class="{ on: n === assetName }"
+          @click="showModel(n, false)"
+        >
+          {{ n }}
+        </button>
+      </div>
       <div class="hud">
         <span>{{ assetName || "视窗" }}</span>
         <span v-if="busy">导出中…</span>
@@ -367,8 +412,30 @@ form input {
   outline: none;
 }
 form input:focus { border-color: #5b6b88; }
+.jobs { padding: 0 16px 8px; display: flex; flex-direction: column; gap: 4px; }
+.job { font-size: 11px; color: var(--muted); }
+.job.running { color: var(--accent); }
+.job.ok { color: var(--live); }
+.job.fail { color: var(--fake); }
 .stage-wrap { position: relative; min-width: 0; min-height: 0; }
-.stage { position: absolute; inset: 0; background: #0e1116; }
+.stage { position: absolute; inset: 0 0 44px 0; background: #0e1116; }
+.veil {
+  position: absolute; inset: 0 0 44px 0;
+  display: grid; place-items: center;
+  background: rgba(8,10,14,0.45);
+  pointer-events: none;
+}
+.assets {
+  position: absolute; left: 0; right: 0; bottom: 40px;
+  display: flex; gap: 6px; overflow: auto;
+  padding: 0 12px 8px;
+}
+.assets button {
+  font-size: 10px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.assets button.on { border-color: var(--accent); color: var(--accent); }
 .hud {
   position: absolute;
   left: 12px;

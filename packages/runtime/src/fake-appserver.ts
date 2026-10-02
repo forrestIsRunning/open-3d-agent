@@ -222,6 +222,22 @@ rl.on("line", (line) => {
       });
       return;
     }
+    if (mode === "generate-tool") {
+      write({
+        jsonrpc: "2.0",
+        id: "srv-tool-gen",
+        method: ServerMethod.toolCall,
+        params: {
+          threadId,
+          turnId,
+          callId: "call-gen",
+          namespace: null,
+          tool: HostTool.generate3d,
+          arguments: { prompt: "a puppy", name: "puppy" },
+        },
+      });
+      return;
+    }
 
     notify(ServerNotify.itemCompleted, {
       threadId,

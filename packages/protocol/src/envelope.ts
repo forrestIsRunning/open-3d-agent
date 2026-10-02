@@ -27,6 +27,8 @@ export const EnvelopeMethod = {
   runCube: "workspace.runCube",
   runLamb: "workspace.runLamb",
   runTripo: "workspace.runTripo",
+  generate3d: "workspace.generate3d",
+  listAssets: "workspace.listAssets",
 } as const;
 
 export const EnvelopeEventMethod = {

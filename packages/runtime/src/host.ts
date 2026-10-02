@@ -10,6 +10,7 @@ import { seedWorkspace } from "./workspace.ts";
 import { commitModel } from "./commit-model.ts";
 import { loadDotenv } from "./dotenv.ts";
 import { fakeServerFile, nodeBin, sessionEnv, tsxCli } from "./spawn-paths.ts";
+import { listAssets } from "./assets.ts";
 import { runCube, runLamb } from "./run-cube.ts";
 import { runTripo } from "./run-tripo.ts";
 import { openLabDb, type LabDb } from "./lab-db.ts";
@@ -158,9 +159,21 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
     return { path: dest };
   }
   if (method === EnvelopeMethod.runTripo) {
-    const dest = runTripo(workspace, String(params.prompt ?? "a cute low poly fox"));
+    const dest = runTripo(workspace, String(params.prompt ?? "a cute low poly fox"), String(params.name ?? "fox"));
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
+  }
+  if (method === EnvelopeMethod.generate3d) {
+    const dest = runTripo(
+      workspace,
+      String(params.prompt ?? "a 3d model"),
+      String(params.name ?? "gen"),
+    );
+    emit(EnvelopeEventMethod.modelReady, { path: dest });
+    return { path: dest };
+  }
+  if (method === EnvelopeMethod.listAssets) {
+    return { names: listAssets(workspace) };
   }
   if (method === EnvelopeMethod.runtimeStop) {
     await session?.stop();

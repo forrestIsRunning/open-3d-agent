@@ -1,52 +1,25 @@
 # Lab 3D workspace
 
-You edit 3D models by writing Blender scripts. The user talks in natural language.
+You are a 3D generation assistant in this workspace. Talk to the user. Generation is done by **host tools**, never by spawning Blender.app or running `tripo` / `zsh -lc` yourself.
 
 ## Layout
 
-- `lab-<name>_<n>.glb` at workspace root: versioned models. Highest `n` is current.
-- `exports/`: write new GLB here, then call the host tool `workspace_commit_model` with `name` and `exportPath`.
-- `scripts/`: Blender python scripts, prefix `lab-`.
+- `lab-<name>_<n>.glb` at workspace root: versioned models.
+- `exports/`: scratch GLB from host pipelines.
+- `scripts/lab-*.py`: headless Blender scripts the host may run.
 
-## Blender
+## Host tools (required)
 
-Absolute binary: `$BLENDER_BIN` (never the bare name `blender`).
+- `workspace_generate_3d` `{ prompt, name }` — text to 3D via Tripo with proxy. Use this for dogs, foxes, characters, anything generated.
+- `workspace_run_blender` `{ script, name }` — only `scripts/lab-*.py` (cube, lamb). Headless. Forbidden: `Blender.app`.
+- `workspace_commit_model` `{ name, exportPath }`
+- `workspace_list_assets`
 
-Always headless. GUI + Metal crashes on this Mac.
+Do **not** execute `/Applications/Blender.app/Contents/MacOS/Blender`.
+Do **not** run `tripo make` in the shell. The host already has `http_proxy` / `ALL_PROXY`.
 
-```
-"$BLENDER_BIN" --factory-startup --background --python-exit-code 1 --python scripts/lab-*.py
-```
+If a host tool fails, report the error. Do not fall back to writing a new Blender GUI script.
 
-Do not set `scene.render.engine` to EEVEE / EEVEE_NEXT. GLB export does not need a viewport renderer.
+## Chat
 
-A starter script is `scripts/lab-cube.py`. Lamb mesh: `scripts/lab-lamb.py`. Then `workspace_commit_model`.
-
-Export:
-
-```
-bpy.ops.export_scene.gltf(filepath=..., export_format="GLB", export_extras=True)
-```
-
-Do not import `bpy` from the system Python.
-
-## Tripo
-
-CLI is already logged in. Outbound calls need proxy (already in process env; set if missing):
-
-```
-export http_proxy=http://127.0.0.1:1087
-export https_proxy=http://127.0.0.1:1087
-export ALL_PROXY=socks5://127.0.0.1:1080
-tripo make "<prompt>" --yes --quiet --no-open -o exports/lab-tripo
-```
-
-`-o` is a **directory**. Then `workspace_commit_model` with the generated `.glb` path.
-
-## Rules
-
-- Stay inside this workspace.
-- After a successful commit, tell the user `产物：<filename>`.
-- Prefer Tripo for image/text to 3D. Use Blender for transforms and primitive geometry.
-- When the user asks to make a cube / 立方体, run the Blender command yourself in this turn, then `workspace_commit_model`. Do not tell them to click a UI button. Do not only paste the command.
-- When the user asks to generate a 3D model from a description (fox, animal, character), run `tripo make` yourself, then commit.
+Short answers. After a host tool succeeds, mention the `lab-<name>_<n>.glb` filename.

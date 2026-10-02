@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld("lab", {
   runCube: () => ipcRenderer.invoke("lab:runCube"),
   runLamb: () => ipcRenderer.invoke("lab:runLamb"),
   runTripo: (prompt?: string) => ipcRenderer.invoke("lab:runTripo", prompt),
+  generate: (prompt: string, name: string) => ipcRenderer.invoke("lab:generate", { prompt, name }),
+  listAssets: () => ipcRenderer.invoke("lab:listAssets"),
   stop: () => ipcRenderer.invoke("lab:stop"),
   onEvent: (cb: (ev: { method: string; params: unknown }) => void) => {
     const fn = (_: unknown, ev: { method: string; params: unknown }) => cb(ev);
