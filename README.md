@@ -1,20 +1,20 @@
 # Open 3D Agent
 
-Local desktop **3D agent**: chat on the left, a Three.js stage on the right. The host owns generation (Tripo / headless Blender). Codex talks to an OpenAI-compatible LLM (LiteLLM) and never launches `Blender.app`.
+Local desktop **3D agent**: chat on the left, a Three.js stage on the right. The host owns generation (Tripo / headless Blender). Codex talks to an OpenAI-compatible LLM and never launches `Blender.app`.
 
 Default workspace: `~/3d-agent-workspaces/default`.
 
 ## What it does
 
-- **Talk about the model on stage.** Sends include `当前舞台：cat · v2`. Transcript is SQLite; Codex thread is reused (`ephemeral: false`).
-- **Text to 3D.** Host runs `tripo make` → `lab-<name>_N.glb`, loads it in the viewer.
-- **Image to 3D / edit.** `+` / drop / paste a picture. Send → image-to-model. 「改成红色」on the current family → image-to-image then image-to-model → `lab-<family>_N+1`.
-- **Import GLB.** Same `+` accepts `.glb` / `.gltf`.
-- **Deterministic edits.** 「对齐地面」「身高 1.7 米」run headless Blender on the current GLB.
-- **Stage.** Orbit, pick, lights, version filmstrip, product-shot capture (no grid) as the edit condition, lookbook (before / concept / GLB).
+- **Talk about the model on stage.** Each turn includes `Stage: cat · v2`. Transcript is SQLite; the Codex thread is reused (`ephemeral: false`).
+- **Text to 3D.** Host runs `tripo make` → `lab-<name>_N.glb` and loads it in the viewer.
+- **Image to 3D / edit.** `+` / drop / paste a picture. Send → image-to-model. “make the coat red” on the current family → image-to-image then image-to-model → `lab-<family>_N+1`.
+- **Import GLB.** The same `+` accepts `.glb` / `.gltf`.
+- **Deterministic edits.** “align to ground” / “height 1.7 m” run headless Blender on the current GLB.
+- **Stage.** Orbit, pick, lights, version filmstrip, product-shot capture (no grid) as the edit condition, lookbook (before / concept / result).
 - **Approval.** `APPROVAL_POLICY=on-request` blocks shell until Allow / Deny.
 
-This is a learning lab, not a commercial Hi3D clone. No copied skills, cookies, or billing.
+A learning lab. No commercial skill packs, cookies, or billing.
 
 ## Design
 
@@ -28,8 +28,8 @@ This is a learning lab, not a commercial Hi3D clone. No copied skills, cookies, 
 ┌──────────── host.ts (tsx, owns tools) ──────────────┐
 │  classifyIntent → generate | edit | transform | cube│
 │                                                     │
-│  Codex app-server ──LiteLLM──► LLM (chat / check)   │
-│  tripo CLI        ──proxy───► text/image 3D         │
+│  Codex app-server ──OpenAI-compatible API──► LLM    │
+│  tripo CLI        ──optional proxy──────► 3D mesh   │
 │  Blender --background --factory-startup → GLB       │
 └─────────────────────┬───────────────────────────────┘
                       ▼
@@ -42,11 +42,11 @@ This is a learning lab, not a commercial Hi3D clone. No copied skills, cookies, 
 | Job | Owner |
 |---|---|
 | Mesh / GLB | Host → Tripo CLI or headless Blender |
-| Chat, check, verbal comments | Codex → LiteLLM (`MODEL`, `OPENAI_BASE_URL`) |
+| Chat, check, verbal comments | Codex → OpenAI-compatible API (`MODEL`, `OPENAI_BASE_URL`) |
 | Scale / ground / yaw | `templates/scripts/lab-transform.py` |
 | Scene compose (plaza) | `lab-plaza.py` (script, not the chat loop) |
 
-The LLM never deforms vertices. 「改瘦一点」re-runs generation or a Blender script.
+The LLM never deforms vertices. “make it thinner” re-runs generation or a Blender script.
 
 Pinned Codex CLI: `CODEX_VERSION` → **0.158.0**. Isolated `CODEX_HOME` in-repo; `wire_api = responses`.
 
@@ -74,19 +74,19 @@ Workspace packages `@lab3d/protocol` and `@lab3d/runtime` have **no** third-part
 |---|---|---|
 | **Node.js** ≥ 22, **pnpm** 10 | install / `pnpm dev` | |
 | **codex** 0.158.0 | `codex app-server` stdio JSON-RPC | doctor checks version |
-| **Blender** (`BLENDER_BIN`) | cube, lamb, transform, plaza | always `--factory-startup --background`. GUI `Blender.app` crashes Metal on this machine |
-| **tripo** CLI (Homebrew `/opt/homebrew/bin/tripo`) | text-to-3D, image-to-image, image-to-model | logged-in Tripo account / credits |
+| **Blender** (`BLENDER_BIN`) | cube, lamb, transform, plaza | always `--factory-startup --background`. GUI `Blender.app` can SIGSEGV on Metal |
+| **tripo** CLI | text-to-3D, image-to-image, image-to-model | logged-in Tripo account / credits |
 
 ### Network services
 
 | Service | Env | Role |
 |---|---|---|
-| OpenAI-compatible LLM | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `MODEL`, `PROVIDER` | default LiteLLM `deepseek-v4.1-flash` |
-| Tripo cloud | `tripo` login + `http_proxy` / `ALL_PROXY` | generation |
-| Optional HTTP proxy | `http_proxy` / `https_proxy` (e.g. `127.0.0.1:1087`) | Codex + Tripo |
+| OpenAI-compatible LLM | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `MODEL`, `PROVIDER` | any `/v1` relay |
+| Tripo cloud | `tripo` login + optional proxy | generation |
+| Optional HTTP proxy | `http_proxy` / `https_proxy` | Codex + Tripo |
 | Optional SOCKS | `ALL_PROXY=socks5://127.0.0.1:1080` | **Codex/Tripo only**. Do not set `ALL_PROXY` on the Electron installer |
 
-`.env` is gitignored. `.env.example` has empty `OPENAI_API_KEY`.
+`.env` is gitignored. `.env.example` has an empty `OPENAI_API_KEY`.
 
 ## Get started
 
@@ -96,7 +96,7 @@ Workspace packages `@lab3d/protocol` and `@lab3d/runtime` have **no** third-part
 - Codex CLI **0.158.0** on `PATH`
 - Blender (path in `.env`)
 - `tripo` CLI logged in (for real 3D)
-- LLM key for LiteLLM / OpenAI-compatible `/v1`
+- An API key for an OpenAI-compatible `/v1` endpoint
 
 ### 1. Install
 
@@ -113,13 +113,14 @@ pnpm lab-doctor
 
 ```bash
 OPENAI_API_KEY=
-OPENAI_BASE_URL=https://litellm-business-relay.vast-internal.com/v1
-MODEL=deepseek-v4.1-flash
-PROVIDER=litellm
+OPENAI_BASE_URL=https://api.openai.com/v1
+MODEL=gpt-4o
+PROVIDER=openai
 
-http_proxy=http://127.0.0.1:1087
-https_proxy=http://127.0.0.1:1087
-ALL_PROXY=socks5://127.0.0.1:1080
+# optional
+# http_proxy=http://127.0.0.1:1087
+# https_proxy=http://127.0.0.1:1087
+# ALL_PROXY=socks5://127.0.0.1:1080
 
 BLENDER_BIN=/Applications/Blender.app/Contents/MacOS/Blender
 APPROVAL_POLICY=never   # or on-request
@@ -132,18 +133,18 @@ pnpm dev          # LIVE: real Codex + Tripo/Blender
 pnpm dev:fake     # red FAKE badge; canned AGENTS.md, no LLM
 ```
 
-Green **LIVE** in the rail means Codex is up. Chat is the product surface (`+` to attach files). Cube / lamb still work by typing 「做一个立方体」 / 「小羊」.
+Green **LIVE** in the rail means Codex is up. Chat is the product surface (`+` to attach files). Cube / lamb still work by typing “make a cube” / “lamb”.
 
 ## Usage
 
 | You type / do | What runs |
 |---|---|
-| 「生成一只小猫」 | `tripo make` → `lab-cat_N.glb` |
+| `generate a kitten` | `tripo make` → `lab-cat_N.glb` |
 | `+` image, send | `tripo generate image-to-model` |
-| 「把衣服改成红色」 | screenshot or attach → image-to-image → image-to-model → next family version |
-| 「对齐地面」 / 「身高 1.7 米」 | headless `lab-transform.py` |
+| `make the coat red` | screenshot or attach → image-to-image → image-to-model → next family version |
+| `align to ground` / `height 1.7 m` | headless `lab-transform.py` |
 | drop `.glb` | copy into workspace, load stage |
-| 「做一个立方体」 | `lab-cube.py` |
+| `make a cube` | `lab-cube.py` |
 
 Assets: `lab-<family>_<n>.glb`. Filmstrip label: `cat · v2`.
 
@@ -154,8 +155,8 @@ pnpm test              # runtime L0 (fake app-server, stub Tripo, intent, edit f
 pnpm e2e:cube          # Blender cube, no LLM
 pnpm e2e:transform     # Blender ground on cube
 pnpm e2e:tripo         # live tripo (needs login)
-pnpm lab:fake -- --prompt "列出文件"
-pnpm lab -- --prompt "介绍一下自己" --timeout 90
+pnpm lab:fake -- --prompt "list the files"
+pnpm lab -- --prompt "introduce yourself" --timeout 90
 ```
 
 `pnpm lab-doctor` checks Codex version, Blender path, Electron Frameworks, API key, Tripo login.

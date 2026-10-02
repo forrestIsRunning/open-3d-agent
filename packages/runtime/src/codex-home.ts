@@ -16,9 +16,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): LabConfig {
   const repoHome = join(repoRoot, ".codex-home");
   return {
     apiKey: env.OPENAI_API_KEY ?? "",
-    baseUrl: env.OPENAI_BASE_URL ?? "https://litellm-business-relay.vast-internal.com/v1",
-    model: env.MODEL ?? "deepseek-v4.1-flash",
-    provider: env.PROVIDER ?? "litellm",
+    baseUrl: env.OPENAI_BASE_URL ?? "https://api.openai.com/v1",
+    model: env.MODEL ?? "gpt-4o",
+    provider: env.PROVIDER ?? "openai",
     blenderBin: env.BLENDER_BIN ?? "/Applications/Blender.app/Contents/MacOS/Blender",
     approvalPolicy: env.APPROVAL_POLICY === "on-request" ? "on-request" : "never",
     codexHome: env.CODEX_HOME && env.CODEX_HOME.length > 0 ? env.CODEX_HOME : repoHome,

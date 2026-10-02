@@ -33,7 +33,7 @@ export function resolveEditImage(workspace: string, family: string, imagePath?: 
   if (shot) return shot;
   const ref = newestInDir(join(workspace, ".lab/refs"), (n) => /\.(png|jpe?g|webp)$/i.test(n));
   if (ref) return ref;
-  throw new Error("先截一张当前视窗，或拖一张参考图，再改模型");
+  throw new Error("capture the viewport or drop a reference image before editing");
 }
 
 function saveConcept(

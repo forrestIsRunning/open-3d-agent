@@ -15,7 +15,7 @@ function arg(name: string, fallback?: string): string | undefined {
 }
 
 const fake = process.argv.includes("--fake");
-const prompt = arg("--prompt", "列出这个目录里的文件，特别是 AGENTS.md");
+const prompt = arg("--prompt", "List the files in this directory, especially AGENTS.md");
 const timeoutRaw = Number(arg("--timeout", fake ? "2000" : "120000"));
 const timeoutMs = timeoutRaw > 0 && timeoutRaw < 1000 ? timeoutRaw * 1000 : timeoutRaw;
 const workspace = arg("--cwd", join(repoRoot, "tmp-ws"))!;

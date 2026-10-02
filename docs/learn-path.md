@@ -8,5 +8,5 @@
 6. `templates/AGENTS.md` — what the model reads
 7. `apps/desktop` — Vue chat + Three.js
 
-Replay: `pnpm lab:fake -- --prompt "列出文件"`
+Replay: `pnpm lab:fake -- --prompt "list the files"`
 Open `tmp-ws/.lab/rpc.jsonl`.

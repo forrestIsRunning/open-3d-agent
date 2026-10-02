@@ -24,4 +24,4 @@ If a host tool fails, report the error. Do not fall back to writing a new Blende
 
 ## Chat
 
-Short answers. After a host tool succeeds, mention the `lab-<name>_<n>.glb` filename.
+Reply in English. Keep answers short. After a host tool succeeds, mention the `lab-<name>_<n>.glb` filename.

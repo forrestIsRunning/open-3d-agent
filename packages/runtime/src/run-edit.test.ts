@@ -29,5 +29,5 @@ test("T-edit needs image", () => {
   const ws = mkdtempSync(join(tmpdir(), "lab3d-edit2-"));
   writeFileSync(join(ws, "lab-cat_1.glb"), "glTF-stub");
   process.env.LAB_TRIPO_STUB = "1";
-  assert.throws(() => runEdit3d(ws, { prompt: "red", family: "cat" }), /截/);
+  assert.throws(() => runEdit3d(ws, { prompt: "red", family: "cat" }), /viewport|reference/);
 });

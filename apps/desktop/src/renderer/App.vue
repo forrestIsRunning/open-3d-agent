@@ -32,8 +32,8 @@ const look = ref<{ before: string; concept: string; after: string; open: boolean
   after: "",
   open: false,
 });
-const veilLabel = ref("生成中…");
-const stageTitle = computed(() => (assetName.value ? parseAssetName(assetName.value).label : "空舞台"));
+const veilLabel = ref("Working…");
+const stageTitle = computed(() => (assetName.value ? parseAssetName(assetName.value).label : "empty stage"));
 const ready = ref(false);
 const busy = ref(false);
 const fake = ref<boolean | null>(null);
@@ -113,7 +113,7 @@ onMounted(async () => {
     } else {
       messages.value.push({
         role: "system",
-        text: `已连接 ${info.workspace} · thread ${info.threadId ?? "new"}`,
+        text: `Connected ${info.workspace} · thread ${info.threadId ?? "new"}`,
       });
     }
     await refreshAssets();
@@ -126,24 +126,24 @@ onMounted(async () => {
 onUnmounted(() => unsub?.());
 
 function stageContext(): string {
-  const title = assetName.value ? parseAssetName(assetName.value).label : "空舞台";
+  const title = assetName.value ? parseAssetName(assetName.value).label : "empty stage";
   const sel = selectedName();
-  const pick = sel ? `；选中 ${sel}` : "";
-  return `当前舞台：${title}${assetName.value ? `（${assetName.value}）` : ""}${pick}`;
+  const pick = sel ? `; selected ${sel}` : "";
+  return `Stage: ${title}${assetName.value ? ` (${assetName.value})` : ""}${pick}`;
 }
 
 async function send(): Promise<void> {
   const text = input.value.trim();
   if (!text && !pendingImage.value) return;
-  messages.value.push({ role: "user", text: text || `上传 ${pendingLabel.value || "附件"}` });
+  messages.value.push({ role: "user", text: text || `upload ${pendingLabel.value || "attachment"}` });
   input.value = "";
   let intent = classifyIntent(text);
   if (pendingImage.value && (intent.kind === "chat" || !text)) {
-    if (!text || /生成|做成|3d|模型|图生/i.test(text)) {
+    if (!text || /生成|做成|3d|模型|图生|generate|make a 3d/i.test(text)) {
       intent = { kind: "generate", prompt: text || "a 3d model matching this image", name: "ref" };
     }
   }
-  const wrapped = `${stageContext()}\n用户：${text}${pendingImage.value ? `\n附件：${pendingImage.value}` : ""}`;
+  const wrapped = `${stageContext()}\nUser: ${text}${pendingImage.value ? `\nAttachment: ${pendingImage.value}` : ""}`;
   try {
     if (intent.kind === "blender-cube") await cube();
     else if (intent.kind === "blender-lamb") await lamb();
@@ -159,7 +159,7 @@ async function send(): Promise<void> {
     if (intent.kind !== "chat") {
       waiting.value = true;
       await window.lab.send(
-        `${stageContext()}\n[host] 已处理「${text}」。不要执行 Blender.app 或 tripo。用一两句话对着当前舞台回复。`,
+        `${stageContext()}\n[host] Handled "${text}". Do not run Blender.app or tripo. Reply in English in one or two sentences about the current stage.`,
       );
     }
   } catch (err) {
@@ -203,7 +203,7 @@ async function showConcept(rel: string): Promise<void> {
   if (!img.b64) return;
   const url = `data:image/png;base64,${img.b64}`;
   look.value = { ...look.value, concept: url, open: true };
-  veilLabel.value = "概念图已出 · 正在生成 3D";
+  veilLabel.value = "Concept ready · generating 3D";
 }
 
 async function showModel(name: string, notify = true): Promise<void> {
@@ -225,10 +225,10 @@ async function showModel(name: string, notify = true): Promise<void> {
     pickHint.value = "";
     await refreshAssets();
     await snapshotThumb(name);
-    if (notify) messages.value.push({ role: "system", text: `舞台：${parseAssetName(name).label}` });
+    if (notify) messages.value.push({ role: "system", text: `Stage: ${parseAssetName(name).label}` });
   } catch (err) {
     lastModel = "";
-    messages.value.push({ role: "system", text: `加载失败 ${name}: ${String(err)}` });
+    messages.value.push({ role: "system", text: `Failed to load ${name}: ${String(err)}` });
   }
 }
 
@@ -243,7 +243,7 @@ function toggleCompare(): void {
 
 function onFocus(): void {
   focusSelected();
-  pickHint.value = selectedName() || "整体";
+  pickHint.value = selectedName() || "whole model";
 }
 
 async function sendShot(): Promise<void> {
@@ -253,7 +253,7 @@ async function sendShot(): Promise<void> {
   const shot = await window.lab.saveShot(b64);
   pendingImage.value = shot.path;
   look.value = { ...look.value, before: url, open: true };
-  messages.value.push({ role: "user", text: `干净截图已作为下一枪编辑条件 ${shot.name}` });
+  messages.value.push({ role: "user", text: `Product shot attached as edit condition ${shot.name}` });
 }
 
 async function removeAsset(name: string, ev: Event): Promise<void> {
@@ -294,11 +294,11 @@ async function lamb(): Promise<void> {
 }
 
 async function editCurrent(prompt: string): Promise<void> {
-  if (!assetName.value) throw new Error("空舞台：先生成或点开一件模型再改");
+  if (!assetName.value) throw new Error("empty stage: generate or open a model first");
   const family = parseAssetName(assetName.value).family;
   const before = captureProductPng() || capturePng();
   look.value = { before, concept: "", after: "", open: true };
-  veilLabel.value = "正在出概念图…";
+  veilLabel.value = "Generating concept…";
   let imagePath = pendingImage.value;
   if (!imagePath) {
     if (before) {
@@ -325,7 +325,7 @@ async function editCurrent(prompt: string): Promise<void> {
     throw err;
   } finally {
     busy.value = false;
-    veilLabel.value = "生成中…";
+    veilLabel.value = "Working…";
   }
 }
 
@@ -334,7 +334,7 @@ async function transformCurrent(intent: {
   height?: number;
   yaw?: number;
 }): Promise<void> {
-  if (!assetName.value) throw new Error("空舞台：先有一件模型再变换");
+  if (!assetName.value) throw new Error("empty stage: load a model before transform");
   const job = { id: jobSeq++, label: `Blender · ${intent.op}`, status: "running" };
   jobs.value.push(job);
   busy.value = true;
@@ -372,12 +372,12 @@ async function attachFile(file: File): Promise<void> {
     const b64 = await fileToB64(file);
     const r = await window.lab.importGlb(b64, file.name.replace(/\.[^.]+$/, "") || "import");
     const name = r?.path?.split("/").pop();
-    messages.value.push({ role: "system", text: `已导入 ${file.name}` });
+    messages.value.push({ role: "system", text: `Imported ${file.name}` });
     if (name) await showModel(name);
     return;
   }
   if (!file.type.startsWith("image/") && !/\.(png|jpe?g|webp|gif)$/i.test(file.name)) {
-    messages.value.push({ role: "system", text: "请上传图片或 GLB" });
+    messages.value.push({ role: "system", text: "Upload an image or GLB" });
     return;
   }
   const b64 = await fileToB64(file);
@@ -385,7 +385,10 @@ async function attachFile(file: File): Promise<void> {
   pendingImage.value = ref.path;
   pendingLabel.value = file.name;
   pendingPreview.value = `data:${file.type || "image/png"};base64,${b64}`;
-  messages.value.push({ role: "system", text: `已附加 ${file.name}，发送即可图生 3D，或说「改成…」编辑当前模型` });
+  messages.value.push({
+    role: "system",
+    text: `Attached ${file.name}. Send to image-to-3D, or say "make it red" to edit the current model`,
+  });
 }
 
 async function onDrop(ev: DragEvent): Promise<void> {
@@ -416,7 +419,7 @@ function clearAttach(): void {
 }
 
 async function generate(prompt: string, name: string, imagePath?: string): Promise<void> {
-  const job = { id: jobSeq++, label: imagePath ? `图生3D · ${name}` : `Tripo · ${name}`, status: "running" };
+  const job = { id: jobSeq++, label: imagePath ? `Image-to-3D · ${name}` : `Tripo · ${name}`, status: "running" };
   jobs.value.push(job);
   busy.value = true;
   try {
@@ -461,12 +464,12 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
         </article>
         <article v-if="waiting" class="msg agent">
           <span class="who">agent</span>
-          <p class="pulse">正在回复…</p>
+          <p class="pulse">Thinking…</p>
         </article>
       </div>
 
       <div v-if="approval" class="approval">
-        <div class="ap-label">需要审批</div>
+        <div class="ap-label">Approval needed</div>
         <code>{{ approval.text }}</code>
         <div class="ap-btns">
           <button class="ok" @click="decide(true)">Allow</button>
@@ -488,31 +491,31 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
             accept="image/png,image/jpeg,image/webp,.glb,.gltf"
             @change="onPick"
           />
-          <button type="button" class="plus" :disabled="!ready || busy" aria-label="上传" @click="fileRef?.click()">
+          <button type="button" class="plus" :disabled="!ready || busy" aria-label="Attach" @click="fileRef?.click()">
             +
           </button>
           <input
             v-model="input"
             :disabled="!ready || busy"
-            :placeholder="pendingImage ? `附图已就绪，发送或说「改成…」` : `你想做什么 3D？`"
+            :placeholder="pendingImage ? `Image attached — send or say make it red` : `What 3D model do you want?`"
             @paste="onPaste"
           />
-          <button class="send" type="submit" :disabled="!ready || busy" aria-label="发送">↑</button>
+          <button class="send" type="submit" :disabled="!ready || busy" aria-label="Send">↑</button>
         </form>
       </div>
     </aside>
 
     <main class="stage-wrap" @drop="onDrop" @dragover.prevent>
       <div class="tools">
-        <button type="button" @click="onFocus">聚焦</button>
-        <button type="button" @click="sendShot">截图回灌</button>
+        <button type="button" @click="onFocus">Focus</button>
+        <button type="button" @click="sendShot">Capture</button>
         <select v-model="lights" @change="applyLights">
-          <option value="studio">灯光 · 摄影棚</option>
-          <option value="soft">灯光 · 柔和</option>
-          <option value="rim">灯光 · 轮廓</option>
+          <option value="studio">Lights · studio</option>
+          <option value="soft">Lights · soft</option>
+          <option value="rim">Lights · rim</option>
         </select>
-        <button type="button" :class="{ on: compare }" @click="toggleCompare">对比上一版</button>
-        <button type="button" :class="{ on: look.open }" @click="look.open = !look.open">看片</button>
+        <button type="button" :class="{ on: compare }" @click="toggleCompare">Compare</button>
+        <button type="button" :class="{ on: look.open }" @click="look.open = !look.open">Lookbook</button>
       </div>
       <div class="stage" ref="viewRef"></div>
       <div v-if="busy" class="veil">
@@ -522,15 +525,15 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
       <div v-if="look.open && (look.before || look.concept || look.after)" class="lookbook">
         <figure v-if="look.before">
           <img :src="look.before" alt="" />
-          <figcaption>原版</figcaption>
+          <figcaption>Before</figcaption>
         </figure>
         <figure v-if="look.concept">
           <img :src="look.concept" alt="" />
-          <figcaption>概念图</figcaption>
+          <figcaption>Concept</figcaption>
         </figure>
         <figure v-if="look.after">
           <img :src="look.after" alt="" />
-          <figcaption>成片</figcaption>
+          <figcaption>Result</figcaption>
         </figure>
       </div>
       <div class="film">
@@ -549,9 +552,9 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
       </div>
       <div class="hud">
         <span>{{ stageTitle }}</span>
-        <span v-if="pickHint">选中 {{ pickHint }}</span>
-        <span v-if="busy">导出中…</span>
-        <span v-else-if="waiting">模型思考中…</span>
+        <span v-if="pickHint">Selected {{ pickHint }}</span>
+        <span v-if="busy">Exporting…</span>
+        <span v-else-if="waiting">Thinking…</span>
       </div>
     </main>
   </div>
