@@ -1,4 +1,4 @@
-# desktop-3d-agent
+# Open 3D Agent
 
 Local desktop **3D agent**: chat on the left, a Three.js stage on the right. The host owns generation (Tripo / headless Blender). Codex talks to an OpenAI-compatible LLM (LiteLLM) and never launches `Blender.app`.
 
@@ -101,8 +101,8 @@ Workspace packages `@lab3d/protocol` and `@lab3d/runtime` have **no** third-part
 ### 1. Install
 
 ```bash
-git clone git@github.com:forrestIsRunning/desktop-3d-agent.git
-cd desktop-3d-agent
+git clone git@github.com:forrestIsRunning/open-3d-agent.git
+cd open-3d-agent
 cp .env.example .env   # fill OPENAI_API_KEY
 pnpm install
 pnpm electron:install  # if Electron Frameworks are missing; uses https_proxy, not ALL_PROXY
