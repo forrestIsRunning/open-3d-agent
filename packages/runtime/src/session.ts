@@ -4,6 +4,7 @@ import { listAssets } from "./assets.ts";
 import { commitModel } from "./commit-model.ts";
 import { runBlenderScript } from "./run-blender.ts";
 import { runEdit3d } from "./run-edit.ts";
+import { runFillHoles } from "./run-repair.ts";
 import { runTransform } from "./run-transform.ts";
 import { runTripo } from "./run-tripo.ts";
 
@@ -213,6 +214,12 @@ export class AgentSession {
         yaw: args.yaw,
       });
     }
+    if (tool === HostTool.fillHoles) {
+      return runFillHoles(this.workspace, args.source ?? "");
+    }
+    if (tool === HostTool.runPlaza) {
+      return runBlenderScript(this.workspace, "lab-plaza.py", "plaza");
+    }
     if (tool === HostTool.runBlender) {
       return runBlenderScript(this.workspace, args.script ?? "lab-cube.py", args.name ?? "model");
     }
@@ -307,6 +314,22 @@ function hostTools(): unknown[] {
         },
         required: ["source", "op"],
       },
+    },
+    {
+      type: "function",
+      name: HostTool.fillHoles,
+      description: "Headless Blender fill_holes on lab-*_n.glb, commit next family version.",
+      inputSchema: {
+        type: "object",
+        properties: { source: { type: "string" } },
+        required: ["source"],
+      },
+    },
+    {
+      type: "function",
+      name: HostTool.runPlaza,
+      description: "Compose a scaled plaza from current lab-*.glb assets. Headless Blender.",
+      inputSchema: { type: "object", properties: {} },
     },
     {
       type: "function",

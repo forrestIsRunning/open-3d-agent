@@ -18,7 +18,13 @@ export function seedWorkspace(workspace: string, blenderBin?: string): void {
   }
   writeFileSync(join(workspace, "AGENTS.md"), agents);
   copyTree(join(templatesRoot, "skills"), join(workspace, "skills"));
-  for (const script of ["lab-cube.py", "lab-lamb.py", "lab-plaza.py", "lab-transform.py"]) {
+  for (const script of [
+    "lab-cube.py",
+    "lab-lamb.py",
+    "lab-plaza.py",
+    "lab-transform.py",
+    "lab-fill-holes.py",
+  ]) {
     const src = join(templatesRoot, "scripts", script);
     if (existsSync(src)) copyTree(src, join(workspace, "scripts", script));
   }

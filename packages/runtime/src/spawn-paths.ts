@@ -29,6 +29,15 @@ export function extraPath(): string {
   ].join(":");
 }
 
+export function tripoBin(): string {
+  const named = process.env.TRIPO_BIN;
+  if (named && existsSync(named)) return named;
+  for (const p of ["/opt/homebrew/bin/tripo", "/usr/local/bin/tripo"]) {
+    if (existsSync(p)) return p;
+  }
+  return "tripo";
+}
+
 /** Proxy only for outbound CLI (tripo / Codex tools). Do not set ALL_PROXY on Electron itself. */
 export function labProxyEnv(): Record<string, string> {
   const http = process.env.http_proxy || process.env.HTTP_PROXY || "http://127.0.0.1:1087";

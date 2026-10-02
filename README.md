@@ -37,6 +37,8 @@ Needs macOS, Node 22, Codex CLI **0.158.0**, Blender, and a logged-in `tripo` CL
 
 Type `generate a fox`, or hit **+** and send a photo. Edit is a new version of the same family (`fox · v2`), not a new identity.
 
+Hi3D-class quick starts vs this lab: [`docs/hi3d-gap.md`](docs/hi3d-gap.md).
+
 ## Limits
 
 No in-chat sculpting. No cancel mid-Tripo. Codex must not open `Blender.app` (use the host). `.env` is gitignored.

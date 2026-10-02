@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld("lab", {
     ipcRenderer.invoke("lab:edit", { prompt, family, imagePath }),
   transform: (source: string, op: string, extra?: { height?: number; yaw?: number }) =>
     ipcRenderer.invoke("lab:transform", { source, op, ...extra }),
+  plaza: () => ipcRenderer.invoke("lab:plaza"),
+  fillHoles: (source: string) => ipcRenderer.invoke("lab:fillHoles", source),
   saveRef: (b64: string, ext?: string) => ipcRenderer.invoke("lab:saveRef", b64, ext),
   listAssets: () => ipcRenderer.invoke("lab:listAssets"),
   saveImage: (name: string, b64: string) => ipcRenderer.invoke("lab:saveImage", name, b64),

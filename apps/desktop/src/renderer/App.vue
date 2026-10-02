@@ -152,11 +152,20 @@ async function send(): Promise<void> {
     }
     else if (intent.kind === "edit") await editCurrent(intent.prompt);
     else if (intent.kind === "blender-transform") await transformCurrent(intent);
+    else if (intent.kind === "blender-plaza") await runNamed("Plaza", () => window.lab.plaza());
+    else if (intent.kind === "blender-repair") {
+      if (!assetName.value) throw new Error("empty stage: load a model before fill-holes");
+      await runNamed("Fill holes", () => window.lab.fillHoles(assetName.value));
+    }
+    else if (intent.kind === "unsupported") {
+      messages.value.push({ role: "system", text: intent.reason });
+      return;
+    }
     else {
       waiting.value = true;
       await window.lab.send(wrapped);
     }
-    if (intent.kind !== "chat") {
+    if (intent.kind !== "chat" && intent.kind !== "unsupported") {
       waiting.value = true;
       await window.lab.send(
         `${stageContext()}\n[host] Handled "${text}". Do not run Blender.app or tripo. Reply in English in one or two sentences about the current stage.`,
@@ -267,30 +276,29 @@ async function removeAsset(name: string, ev: Event): Promise<void> {
   await refreshAssets();
 }
 
-async function cube(): Promise<void> {
+async function runNamed(label: string, fn: () => Promise<{ path?: string }>): Promise<void> {
+  const job = { id: jobSeq++, label, status: "running" };
+  jobs.value.push(job);
   busy.value = true;
   try {
-    const r = await window.lab.runCube();
-    const name = r?.path?.split("/").pop();
-    if (name) await showModel(name);
+    const r = await fn();
+    const file = r?.path?.split("/").pop();
+    job.status = "ok";
+    if (file) await showModel(file);
   } catch (err) {
-    messages.value.push({ role: "system", text: String(err) });
+    job.status = "fail";
+    throw err;
   } finally {
     busy.value = false;
   }
 }
 
+async function cube(): Promise<void> {
+  await runNamed("Blender · cube", () => window.lab.runCube());
+}
+
 async function lamb(): Promise<void> {
-  busy.value = true;
-  try {
-    const r = await window.lab.runLamb();
-    const name = r?.path?.split("/").pop();
-    if (name) await showModel(name);
-  } catch (err) {
-    messages.value.push({ role: "system", text: String(err) });
-  } finally {
-    busy.value = false;
-  }
+  await runNamed("Blender · lamb", () => window.lab.runLamb());
 }
 
 async function editCurrent(prompt: string): Promise<void> {

@@ -30,6 +30,8 @@ export const EnvelopeMethod = {
   generate3d: "workspace.generate3d",
   edit3d: "workspace.edit3d",
   transformModel: "workspace.transformModel",
+  runPlaza: "workspace.runPlaza",
+  fillHoles: "workspace.fillHoles",
   listAssets: "workspace.listAssets",
 } as const;
 

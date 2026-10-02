@@ -27,6 +27,8 @@ declare global {
         op: string,
         extra?: { height?: number; yaw?: number },
       ) => Promise<{ path?: string }>;
+      plaza: () => Promise<{ path?: string }>;
+      fillHoles: (source: string) => Promise<{ path?: string }>;
       saveRef: (b64: string, ext?: string) => Promise<{ name: string; path: string }>;
       listAssets: () => Promise<{ names: string[] }>;
       saveImage: (name: string, b64: string) => Promise<{ path?: string }>;

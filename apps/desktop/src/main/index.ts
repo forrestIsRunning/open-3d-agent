@@ -172,6 +172,10 @@ app.whenReady().then(async () => {
     async (_e, payload: { source: string; op: string; height?: number; yaw?: number }) =>
       sendHost(EnvelopeMethod.transformModel, payload),
   );
+  ipcMain.handle("lab:plaza", async () => sendHost(EnvelopeMethod.runPlaza, {}));
+  ipcMain.handle("lab:fillHoles", async (_e, source: string) =>
+    sendHost(EnvelopeMethod.fillHoles, { source }),
+  );
   ipcMain.handle("lab:saveRef", async (_e, b64: string, ext = "png") => {
     const dir = join(workspace, ".lab/refs");
     mkdirSync(dir, { recursive: true });

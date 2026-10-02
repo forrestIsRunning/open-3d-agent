@@ -18,6 +18,8 @@ test("T-no-shell-blender in AGENTS.md", async () => {
   assert.match(md, /workspace_generate_3d/);
   assert.match(md, /workspace_edit_3d/);
   assert.match(md, /workspace_transform_model/);
+  assert.match(md, /workspace_fill_holes/);
+  assert.match(md, /workspace_run_plaza/);
 });
 
 test("T-intent chat vs cube vs lamb", () => {
@@ -37,4 +39,52 @@ test("T-intent edit vs generate vs transform", () => {
     assert.equal(h.height, 1.7);
   }
   assert.equal(classifyIntent("帮我生成一个小狗的3d model").kind, "generate");
+});
+
+test("T-hi3d-quickstarts map to honest intents", () => {
+  const rows: Array<[string, string]> = [
+    [
+      "Create a short story scene with these characters, coordinating their actions, positions, facing directions, and timing.",
+      "unsupported",
+    ],
+    [
+      "Build a game or VR environment using these assets, matching their relative scales and organizing them into a coherent, navigable space.",
+      "blender-plaza",
+    ],
+    [
+      "Assemble these assets into a themed miniature world with a main subject, environment, accessories, and base, and optimize its structure for 3D printing.",
+      "unsupported",
+    ],
+    [
+      "Create multiple layout options for this space, accounting for functional needs, walkways, and visibility, and present them for comparison.",
+      "unsupported",
+    ],
+    [
+      "Unify textures, materials, and colors across these assets while preserving each asset’s distinctive features.",
+      "edit",
+    ],
+    [
+      "Create a complete demo video of this scene, coordinating lighting, camera movement, animation, and pacing.",
+      "unsupported",
+    ],
+    [
+      "Find and fill unintended holes in this model while preserving its overall shape and intentional openings.",
+      "blender-repair",
+    ],
+    [
+      "Check this model’s textures and fix missing textures, distortion, and visible seams while preserving its intended appearance.",
+      "edit",
+    ],
+    [
+      "Check and correct this character’s skinning weights to reduce unnatural deformation during movement while preserving the existing skeleton.",
+      "unsupported",
+    ],
+    [
+      "Split this model into parts and add matching connectors for assembly, allowing appropriate clearance while preserving the model’s assembled appearance.",
+      "unsupported",
+    ],
+  ];
+  for (const [prompt, kind] of rows) {
+    assert.equal(classifyIntent(prompt).kind, kind, prompt.slice(0, 48));
+  }
 });

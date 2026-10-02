@@ -50,4 +50,6 @@ export const HostTool = {
   listAssets: "workspace_list_assets",
   edit3d: "workspace_edit_3d",
   transformModel: "workspace_transform_model",
+  fillHoles: "workspace_fill_holes",
+  runPlaza: "workspace_run_plaza",
 } as const;
