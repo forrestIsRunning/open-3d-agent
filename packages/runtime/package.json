@@ -13,7 +13,8 @@
     "e2e:cube": "tsx src/e2e-cube.ts",
     "e2e:lamb": "tsx src/e2e-lamb.ts",
     "e2e:tripo": "tsx src/e2e-tripo.ts",
-    "e2e:tripo-offline": "tsx src/e2e-tripo-offline.ts"
+    "e2e:tripo-offline": "tsx src/e2e-tripo-offline.ts",
+    "e2e:transform": "tsx src/e2e-transform.ts"
   },
   "dependencies": {
     "@lab3d/protocol": "workspace:*"

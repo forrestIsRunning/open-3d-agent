@@ -12,6 +12,8 @@ import { loadDotenv } from "./dotenv.ts";
 import { fakeServerFile, nodeBin, sessionEnv, tsxCli } from "./spawn-paths.ts";
 import { listAssets } from "./assets.ts";
 import { runCube, runLamb } from "./run-cube.ts";
+import { runEdit3d } from "./run-edit.ts";
+import { runTransform } from "./run-transform.ts";
 import { runTripo } from "./run-tripo.ts";
 import { openLabDb, type LabDb } from "./lab-db.ts";
 
@@ -168,7 +170,28 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       workspace,
       String(params.prompt ?? "a 3d model"),
       String(params.name ?? "gen"),
+      params.imagePath ? String(params.imagePath) : undefined,
     );
+    emit(EnvelopeEventMethod.modelReady, { path: dest });
+    return { path: dest };
+  }
+  if (method === EnvelopeMethod.edit3d) {
+    const dest = runEdit3d(workspace, {
+      prompt: String(params.prompt ?? ""),
+      family: String(params.family ?? ""),
+      imagePath: params.imagePath ? String(params.imagePath) : undefined,
+      onConcept: (rel) => emit(EnvelopeEventMethod.editConcept, { path: rel, family: params.family }),
+    });
+    emit(EnvelopeEventMethod.modelReady, { path: dest });
+    return { path: dest };
+  }
+  if (method === EnvelopeMethod.transformModel) {
+    const dest = runTransform(workspace, {
+      source: String(params.source ?? ""),
+      op: (params.op as "ground" | "height" | "yaw") ?? "ground",
+      height: params.height != null ? Number(params.height) : undefined,
+      yaw: params.yaw != null ? Number(params.yaw) : undefined,
+    });
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }

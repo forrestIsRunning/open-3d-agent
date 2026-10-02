@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 let renderer: THREE.WebGLRenderer | null = null;
@@ -13,8 +14,12 @@ let selectedBox: THREE.BoxHelper | null = null;
 let ambient: THREE.AmbientLight | null = null;
 let keyLight: THREE.DirectionalLight | null = null;
 let fillLight: THREE.DirectionalLight | null = null;
+let grid: THREE.GridHelper | null = null;
+let ground: THREE.Mesh | null = null;
 let hostEl: HTMLElement | null = null;
 let compareOn = false;
+const viewBg = new THREE.Color(0x0e1116);
+const shotBg = new THREE.Color(0xd8dbe3);
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let selectCb: ((name: string) => void) | null = null;
@@ -31,26 +36,51 @@ export function mountViewer(el: HTMLElement): void {
     return;
   }
   scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0e1116);
+  scene.background = viewBg;
   camera = new THREE.PerspectiveCamera(50, 1, 0.01, 100);
   camera.position.set(2.4, 1.8, 2.4);
   camera.lookAt(0, 0.4, 0);
   renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.domElement.style.display = "block";
   renderer.domElement.style.width = "100%";
   renderer.domElement.style.height = "100%";
   el.appendChild(renderer.domElement);
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
-  ambient = new THREE.AmbientLight(0xffffff, 0.55);
-  keyLight = new THREE.DirectionalLight(0xffffff, 1.05);
+  ambient = new THREE.AmbientLight(0xffffff, 0.28);
+  keyLight = new THREE.DirectionalLight(0xfff4e8, 0.85);
   keyLight.position.set(3, 5, 2);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  keyLight.shadow.camera.near = 0.2;
+  keyLight.shadow.camera.far = 40;
+  keyLight.shadow.camera.left = -8;
+  keyLight.shadow.camera.right = 8;
+  keyLight.shadow.camera.top = 8;
+  keyLight.shadow.camera.bottom = -8;
   fillLight = new THREE.DirectionalLight(0x88a0c0, 0.35);
   fillLight.position.set(-4, 1.5, -2);
   scene.add(ambient, keyLight, fillLight);
-  scene.add(new THREE.GridHelper(8, 16, 0x3d4654, 0x252b36));
+  grid = new THREE.GridHelper(8, 16, 0x3d4654, 0x252b36);
+  scene.add(grid);
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(6, 48),
+    new THREE.ShadowMaterial({ opacity: 0.35 }),
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  floor.position.y = 0;
+  ground = floor;
+  scene.add(ground);
 
   renderer.domElement.addEventListener("pointerdown", onPointerDown);
   const loop = () => {
@@ -137,10 +167,10 @@ export function focusSelected(): void {
 export function setLightPreset(kind: "studio" | "soft" | "rim"): void {
   if (!ambient || !keyLight || !fillLight) return;
   if (kind === "studio") {
-    ambient.intensity = 0.55;
-    keyLight.intensity = 1.05;
+    ambient.intensity = 0.28;
+    keyLight.intensity = 0.85;
     keyLight.position.set(3, 5, 2);
-    fillLight.intensity = 0.35;
+    fillLight.intensity = 0.28;
   } else if (kind === "soft") {
     ambient.intensity = 0.95;
     keyLight.intensity = 0.45;
@@ -164,9 +194,62 @@ export function isCompareOn(): boolean {
 }
 
 export function capturePng(): string {
-  if (!renderer) return "";
-  renderer.render(scene!, camera!);
-  return renderer.domElement.toDataURL("image/png");
+  return captureProductPng();
+}
+
+export function captureProductPng(): string {
+  if (!renderer || !scene || !camera) return "";
+  const gridWas = grid?.visible ?? false;
+  const boxWas = selectedBox?.visible ?? false;
+  const prevWas = previous?.visible ?? false;
+  const bg = scene.background;
+  const floor = ground?.material as THREE.ShadowMaterial | THREE.MeshStandardMaterial | undefined;
+  if (grid) grid.visible = false;
+  if (selectedBox) selectedBox.visible = false;
+  if (previous) previous.visible = false;
+  scene.background = shotBg;
+  if (ground) {
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xd0d4dc,
+      roughness: 0.9,
+      metalness: 0,
+    });
+    ground.material = mat;
+    ground.receiveShadow = true;
+  }
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL("image/png");
+  if (grid) grid.visible = gridWas;
+  if (selectedBox) selectedBox.visible = boxWas;
+  if (previous) previous.visible = prevWas;
+  scene.background = bg;
+  if (ground && floor) ground.material = floor;
+  renderer.render(scene, camera);
+  return url;
+}
+
+function prepareMesh(mesh: THREE.Mesh): void {
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  const hasVertexColor = Boolean(mesh.geometry?.getAttribute("color"));
+  for (const raw of list) {
+    const mat = raw as THREE.MeshStandardMaterial;
+    if (!mat) continue;
+    if (mat.map) mat.map.colorSpace = THREE.SRGBColorSpace;
+    if (mat.emissiveMap) mat.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+    if (hasVertexColor) mat.vertexColors = true;
+    // glTF default metallicFactor is 1; Tripo often omits it, so textured characters
+    // render as white metal under an environment map.
+    const looksDefaultMetal =
+      mat.metalness >= 0.99 && mat.roughness >= 0.85 && Boolean(mat.map);
+    if (looksDefaultMetal) {
+      mat.metalness = 0.04;
+      mat.roughness = Math.min(0.72, Math.max(0.45, mat.roughness));
+    }
+    if ("envMapIntensity" in mat) mat.envMapIntensity = looksDefaultMetal ? 0.35 : 0.55;
+    mat.needsUpdate = true;
+  }
 }
 
 export async function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<void> {
@@ -197,6 +280,10 @@ export async function loadGlbBuffer(data: ArrayBuffer | Uint8Array): Promise<voi
           scene!.add(previous);
         }
         current = gltf.scene;
+        current.traverse((n) => {
+          const mesh = n as THREE.Mesh;
+          if (mesh.isMesh) prepareMesh(mesh);
+        });
         scene!.add(current);
         frameObject(current);
         resolve();

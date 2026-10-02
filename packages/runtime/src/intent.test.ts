@@ -16,10 +16,25 @@ test("T-no-shell-blender in AGENTS.md", async () => {
   const md = readFileSync(join(templatesRoot, "AGENTS.md"), "utf8");
   assert.match(md, /Blender\.app/);
   assert.match(md, /workspace_generate_3d/);
+  assert.match(md, /workspace_edit_3d/);
+  assert.match(md, /workspace_transform_model/);
 });
 
 test("T-intent chat vs cube vs lamb", () => {
   assert.equal(classifyIntent("介绍一下自己").kind, "chat");
   assert.equal(classifyIntent("做一个立方体").kind, "blender-cube");
   assert.equal(classifyIntent("帮我做一只小羊").kind, "blender-lamb");
+});
+
+test("T-intent edit vs generate vs transform", () => {
+  assert.equal(classifyIntent("把衣服改成红色").kind, "edit");
+  assert.equal(classifyIntent("耳朵更尖一点").kind, "edit");
+  assert.equal(classifyIntent("对齐地面").kind, "blender-transform");
+  const h = classifyIntent("身高 1.7 米");
+  assert.equal(h.kind, "blender-transform");
+  if (h.kind === "blender-transform") {
+    assert.equal(h.op, "height");
+    assert.equal(h.height, 1.7);
+  }
+  assert.equal(classifyIntent("帮我生成一个小狗的3d model").kind, "generate");
 });

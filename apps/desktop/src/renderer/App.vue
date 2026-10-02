@@ -4,6 +4,7 @@ import { classifyIntent, parseAssetName } from "@lab3d/protocol";
 import {
   captureAfterPaint,
   capturePng,
+  captureProductPng,
   focusSelected,
   loadGlbBuffer,
   mountViewer,
@@ -21,6 +22,17 @@ const thumbs = ref<Record<string, string>>({});
 const lights = ref<"studio" | "soft" | "rim">("studio");
 const compare = ref(false);
 const pickHint = ref("");
+const pendingImage = ref("");
+const pendingLabel = ref("");
+const pendingPreview = ref("");
+const fileRef = ref<HTMLInputElement | null>(null);
+const look = ref<{ before: string; concept: string; after: string; open: boolean }>({
+  before: "",
+  concept: "",
+  after: "",
+  open: false,
+});
+const veilLabel = ref("生成中…");
 const stageTitle = computed(() => (assetName.value ? parseAssetName(assetName.value).label : "空舞台"));
 const ready = ref(false);
 const busy = ref(false);
@@ -81,6 +93,10 @@ onMounted(async () => {
       const name = path.split("/").pop() ?? "";
       void showModel(name, false);
     }
+    if (ev.method === "edit.concept") {
+      const rel = String((ev.params as { path: string }).path);
+      void showConcept(rel);
+    }
   });
   if (!opened) {
     opened = true;
@@ -118,15 +134,24 @@ function stageContext(): string {
 
 async function send(): Promise<void> {
   const text = input.value.trim();
-  if (!text) return;
-  messages.value.push({ role: "user", text });
+  if (!text && !pendingImage.value) return;
+  messages.value.push({ role: "user", text: text || `上传 ${pendingLabel.value || "附件"}` });
   input.value = "";
-  const intent = classifyIntent(text);
-  const wrapped = `${stageContext()}\n用户：${text}`;
+  let intent = classifyIntent(text);
+  if (pendingImage.value && (intent.kind === "chat" || !text)) {
+    if (!text || /生成|做成|3d|模型|图生/i.test(text)) {
+      intent = { kind: "generate", prompt: text || "a 3d model matching this image", name: "ref" };
+    }
+  }
+  const wrapped = `${stageContext()}\n用户：${text}${pendingImage.value ? `\n附件：${pendingImage.value}` : ""}`;
   try {
     if (intent.kind === "blender-cube") await cube();
     else if (intent.kind === "blender-lamb") await lamb();
-    else if (intent.kind === "generate") await generate(intent.prompt, intent.name);
+    else if (intent.kind === "generate") {
+      await generate(intent.prompt, intent.name, pendingImage.value || undefined);
+    }
+    else if (intent.kind === "edit") await editCurrent(intent.prompt);
+    else if (intent.kind === "blender-transform") await transformCurrent(intent);
     else {
       waiting.value = true;
       await window.lab.send(wrapped);
@@ -166,11 +191,19 @@ async function refreshAssets(): Promise<void> {
 }
 
 async function snapshotThumb(name: string): Promise<void> {
-  const url = await captureAfterPaint();
+  const url = captureProductPng() || (await captureAfterPaint());
   if (!url) return;
   thumbs.value[name] = url;
   const b64 = url.replace(/^data:image\/png;base64,/, "");
   await window.lab.saveImage(name.replace(/\.glb$/i, ".png"), b64);
+}
+
+async function showConcept(rel: string): Promise<void> {
+  const img = await window.lab.readLabImage(rel);
+  if (!img.b64) return;
+  const url = `data:image/png;base64,${img.b64}`;
+  look.value = { ...look.value, concept: url, open: true };
+  veilLabel.value = "概念图已出 · 正在生成 3D";
 }
 
 async function showModel(name: string, notify = true): Promise<void> {
@@ -214,15 +247,13 @@ function onFocus(): void {
 }
 
 async function sendShot(): Promise<void> {
-  const url = capturePng();
+  const url = captureProductPng() || capturePng();
   if (!url) return;
   const b64 = url.replace(/^data:image\/png;base64,/, "");
   const shot = await window.lab.saveShot(b64);
-  messages.value.push({ role: "user", text: `视窗截图 ${shot.name}` });
-  waiting.value = true;
-  await window.lab.send(
-    `${stageContext()}\n用户发送了当前视窗截图，已保存 ${shot.path}。请根据当前舞台模型简短回应，不要开 Blender。`,
-  );
+  pendingImage.value = shot.path;
+  look.value = { ...look.value, before: url, open: true };
+  messages.value.push({ role: "user", text: `干净截图已作为下一枪编辑条件 ${shot.name}` });
 }
 
 async function removeAsset(name: string, ev: Event): Promise<void> {
@@ -262,18 +293,137 @@ async function lamb(): Promise<void> {
   }
 }
 
-async function fox(): Promise<void> {
-  await generate("a cute low poly fox", "fox");
-}
-
-async function generate(prompt: string, name: string): Promise<void> {
-  const job = { id: jobSeq++, label: `Tripo · ${name}`, status: "running" };
+async function editCurrent(prompt: string): Promise<void> {
+  if (!assetName.value) throw new Error("空舞台：先生成或点开一件模型再改");
+  const family = parseAssetName(assetName.value).family;
+  const before = captureProductPng() || capturePng();
+  look.value = { before, concept: "", after: "", open: true };
+  veilLabel.value = "正在出概念图…";
+  let imagePath = pendingImage.value;
+  if (!imagePath) {
+    if (before) {
+      const b64 = before.replace(/^data:image\/png;base64,/, "");
+      const shot = await window.lab.saveShot(b64);
+      imagePath = shot.path;
+    }
+  }
+  const job = { id: jobSeq++, label: `Edit · ${family}`, status: "running" };
   jobs.value.push(job);
   busy.value = true;
   try {
-    const r = await window.lab.generate(prompt, name);
+    const r = await window.lab.edit(prompt, family, imagePath || undefined);
     const file = r?.path?.split("/").pop();
     job.status = "ok";
+    clearAttach();
+    if (file) {
+      if (look.value.concept) thumbs.value[file] = look.value.concept;
+      await showModel(file);
+      look.value = { ...look.value, after: thumbs.value[file] || captureProductPng(), open: true };
+    }
+  } catch (err) {
+    job.status = "fail";
+    throw err;
+  } finally {
+    busy.value = false;
+    veilLabel.value = "生成中…";
+  }
+}
+
+async function transformCurrent(intent: {
+  op: "ground" | "height" | "yaw";
+  height?: number;
+  yaw?: number;
+}): Promise<void> {
+  if (!assetName.value) throw new Error("空舞台：先有一件模型再变换");
+  const job = { id: jobSeq++, label: `Blender · ${intent.op}`, status: "running" };
+  jobs.value.push(job);
+  busy.value = true;
+  try {
+    const r = await window.lab.transform(assetName.value, intent.op, {
+      height: intent.height,
+      yaw: intent.yaw,
+    });
+    const file = r?.path?.split("/").pop();
+    job.status = "ok";
+    if (file) await showModel(file);
+  } catch (err) {
+    job.status = "fail";
+    throw err;
+  } finally {
+    busy.value = false;
+  }
+}
+
+function fileToB64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const s = String(reader.result ?? "");
+      resolve(s.includes(",") ? s.slice(s.indexOf(",") + 1) : s);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function attachFile(file: File): Promise<void> {
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (ext === "glb" || ext === "gltf" || file.type === "model/gltf-binary") {
+    const b64 = await fileToB64(file);
+    const r = await window.lab.importGlb(b64, file.name.replace(/\.[^.]+$/, "") || "import");
+    const name = r?.path?.split("/").pop();
+    messages.value.push({ role: "system", text: `已导入 ${file.name}` });
+    if (name) await showModel(name);
+    return;
+  }
+  if (!file.type.startsWith("image/") && !/\.(png|jpe?g|webp|gif)$/i.test(file.name)) {
+    messages.value.push({ role: "system", text: "请上传图片或 GLB" });
+    return;
+  }
+  const b64 = await fileToB64(file);
+  const ref = await window.lab.saveRef(b64, ext || "png");
+  pendingImage.value = ref.path;
+  pendingLabel.value = file.name;
+  pendingPreview.value = `data:${file.type || "image/png"};base64,${b64}`;
+  messages.value.push({ role: "system", text: `已附加 ${file.name}，发送即可图生 3D，或说「改成…」编辑当前模型` });
+}
+
+async function onDrop(ev: DragEvent): Promise<void> {
+  ev.preventDefault();
+  const f = ev.dataTransfer?.files?.[0];
+  if (f) await attachFile(f);
+}
+
+async function onPaste(ev: ClipboardEvent): Promise<void> {
+  const item = [...(ev.clipboardData?.items ?? [])].find((i) => i.type.startsWith("image/"));
+  const f = item?.getAsFile();
+  if (!f) return;
+  ev.preventDefault();
+  await attachFile(f);
+}
+
+async function onPick(ev: Event): Promise<void> {
+  const inputEl = ev.target as HTMLInputElement;
+  const f = inputEl.files?.[0];
+  inputEl.value = "";
+  if (f) await attachFile(f);
+}
+
+function clearAttach(): void {
+  pendingImage.value = "";
+  pendingLabel.value = "";
+  pendingPreview.value = "";
+}
+
+async function generate(prompt: string, name: string, imagePath?: string): Promise<void> {
+  const job = { id: jobSeq++, label: imagePath ? `图生3D · ${name}` : `Tripo · ${name}`, status: "running" };
+  jobs.value.push(job);
+  busy.value = true;
+  try {
+    const r = await window.lab.generate(prompt, name, imagePath);
+    const file = r?.path?.split("/").pop();
+    job.status = "ok";
+    clearAttach();
     if (file) await showModel(file);
   } catch (err) {
     job.status = "fail";
@@ -298,8 +448,6 @@ async function generate(prompt: string, name: string): Promise<void> {
       </header>
 
       <div class="chips">
-        <span class="chip" v-if="model">{{ model }}</span>
-        <span class="chip">{{ policy || "never" }}</span>
         <span class="chip on">{{ stageTitle }}</span>
       </div>
       <div v-if="jobs.length" class="jobs">
@@ -327,19 +475,34 @@ async function generate(prompt: string, name: string): Promise<void> {
       </div>
 
       <div class="dock">
-        <div class="actions">
-          <button class="primary" :disabled="!ready || busy" @click="cube">Blender 立方体</button>
-          <button :disabled="!ready || busy" @click="lamb">Blender 小羊</button>
-          <button :disabled="!ready || busy" @click="fox">Tripo 狐狸</button>
+        <div v-if="pendingPreview" class="attach">
+          <img :src="pendingPreview" alt="" />
+          <span>{{ pendingLabel }}</span>
+          <button type="button" class="x" @click="clearAttach">×</button>
         </div>
-        <form @submit.prevent="send">
-          <input v-model="input" :disabled="!ready" :placeholder="`对着 ${stageTitle} 说…`" />
-          <button class="send" :disabled="!ready">发送</button>
+        <form @submit.prevent="send" @drop="onDrop" @dragover.prevent>
+          <input
+            ref="fileRef"
+            class="file"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,.glb,.gltf"
+            @change="onPick"
+          />
+          <button type="button" class="plus" :disabled="!ready || busy" aria-label="上传" @click="fileRef?.click()">
+            +
+          </button>
+          <input
+            v-model="input"
+            :disabled="!ready || busy"
+            :placeholder="pendingImage ? `附图已就绪，发送或说「改成…」` : `你想做什么 3D？`"
+            @paste="onPaste"
+          />
+          <button class="send" type="submit" :disabled="!ready || busy" aria-label="发送">↑</button>
         </form>
       </div>
     </aside>
 
-    <main class="stage-wrap">
+    <main class="stage-wrap" @drop="onDrop" @dragover.prevent>
       <div class="tools">
         <button type="button" @click="onFocus">聚焦</button>
         <button type="button" @click="sendShot">截图回灌</button>
@@ -349,9 +512,27 @@ async function generate(prompt: string, name: string): Promise<void> {
           <option value="rim">灯光 · 轮廓</option>
         </select>
         <button type="button" :class="{ on: compare }" @click="toggleCompare">对比上一版</button>
+        <button type="button" :class="{ on: look.open }" @click="look.open = !look.open">看片</button>
       </div>
       <div class="stage" ref="viewRef"></div>
-      <div v-if="busy" class="veil">生成中…</div>
+      <div v-if="busy" class="veil">
+        <img v-if="look.concept" :src="look.concept" alt="" />
+        <span>{{ veilLabel }}</span>
+      </div>
+      <div v-if="look.open && (look.before || look.concept || look.after)" class="lookbook">
+        <figure v-if="look.before">
+          <img :src="look.before" alt="" />
+          <figcaption>原版</figcaption>
+        </figure>
+        <figure v-if="look.concept">
+          <img :src="look.concept" alt="" />
+          <figcaption>概念图</figcaption>
+        </figure>
+        <figure v-if="look.after">
+          <img :src="look.after" alt="" />
+          <figcaption>成片</figcaption>
+        </figure>
+      </div>
       <div class="film">
         <button
           v-for="n in assets"
@@ -371,7 +552,6 @@ async function generate(prompt: string, name: string): Promise<void> {
         <span v-if="pickHint">选中 {{ pickHint }}</span>
         <span v-if="busy">导出中…</span>
         <span v-else-if="waiting">模型思考中…</span>
-        <span class="path" :title="workspace">{{ workspace }}</span>
       </div>
     </main>
   </div>
@@ -484,9 +664,33 @@ async function generate(prompt: string, name: string): Promise<void> {
 .ap-btns { display: flex; gap: 8px; margin-top: 8px; }
 .ok { background: #2f6f4e; color: #fff; }
 .no { background: #7a2e2e; color: #fff; }
-.dock { padding: 12px; border-top: 1px solid var(--line); }
-.actions, form { display: flex; gap: 8px; }
-.actions { margin-bottom: 8px; }
+.dock { padding: 12px 14px 16px; border-top: 1px solid var(--line); }
+.attach {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #10141c;
+  font-size: 12px;
+  color: var(--muted);
+}
+.attach img { width: 36px; height: 36px; object-fit: cover; border-radius: 6px; }
+.attach .x { padding: 2px 8px; background: transparent; }
+.file { display: none; }
+button.plus {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 999px;
+  flex: 0 0 36px;
+  font-size: 20px;
+  line-height: 1;
+  background: #1a2030;
+}
+form { display: flex; gap: 8px; align-items: center; }
 button {
   appearance: none;
   border: 1px solid var(--line);
@@ -497,16 +701,25 @@ button {
   cursor: pointer;
 }
 button:disabled { opacity: 0.45; cursor: default; }
-button.primary { background: #c56a2d; border-color: #d07a3c; color: #fff; }
-button.send { background: #2b3344; }
+button.send {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: #2f6f4e;
+  color: #fff;
+  font-size: 16px;
+  flex: 0 0 36px;
+}
 form { flex: 1; }
 form input {
   flex: 1;
   border: 1px solid var(--line);
   background: #10141c;
   color: var(--text);
-  border-radius: 8px;
-  padding: 8px 10px;
+  border-radius: 999px;
+  padding: 10px 16px;
   outline: none;
 }
 form input:focus { border-color: #5b6b88; }
@@ -530,8 +743,48 @@ form input:focus { border-color: #5b6b88; }
 .veil {
   position: absolute; inset: 36px 0 108px 0;
   display: grid; place-items: center;
-  background: rgba(8,10,14,0.45);
+  align-content: center;
+  gap: 10px;
+  background: rgba(8,10,14,0.55);
   pointer-events: none;
+}
+.veil img {
+  max-width: 46%;
+  max-height: 58%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
+}
+.lookbook {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 116px;
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+  z-index: 3;
+}
+.lookbook figure {
+  margin: 0;
+  flex: 1;
+  background: rgba(16,20,28,0.88);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.lookbook img {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: contain;
+  background: #d8dbe3;
+}
+.lookbook figcaption {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  padding: 4px 8px 6px;
 }
 .film {
   position: absolute; left: 0; right: 0; bottom: 40px;

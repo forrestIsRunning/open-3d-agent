@@ -19,10 +19,19 @@ declare global {
       runCube: () => Promise<{ path?: string }>;
       runLamb: () => Promise<{ path?: string }>;
       runTripo: (prompt?: string) => Promise<{ path?: string }>;
-      generate: (prompt: string, name: string) => Promise<{ path?: string }>;
+      generate: (prompt: string, name: string, imagePath?: string) => Promise<{ path?: string }>;
+      importGlb: (b64: string, name?: string) => Promise<{ path?: string }>;
+      edit: (prompt: string, family: string, imagePath?: string) => Promise<{ path?: string }>;
+      transform: (
+        source: string,
+        op: string,
+        extra?: { height?: number; yaw?: number },
+      ) => Promise<{ path?: string }>;
+      saveRef: (b64: string, ext?: string) => Promise<{ name: string; path: string }>;
       listAssets: () => Promise<{ names: string[] }>;
       saveImage: (name: string, b64: string) => Promise<{ path?: string }>;
       readImage: (name: string) => Promise<{ b64?: string }>;
+      readLabImage: (rel: string) => Promise<{ b64?: string; path?: string }>;
       saveShot: (b64: string) => Promise<{ name: string; path: string }>;
       deleteAsset: (name: string) => Promise<unknown>;
       stop: () => Promise<unknown>;

@@ -11,6 +11,8 @@ You are a 3D generation assistant in this workspace. Talk to the user. Generatio
 ## Host tools (required)
 
 - `workspace_generate_3d` `{ prompt, name }` — text to 3D via Tripo with proxy. Use this for dogs, foxes, characters, anything generated.
+- `workspace_edit_3d` `{ prompt, family, imagePath? }` — restyle the **current** family (image-to-image then image-to-model). Commit `lab-<family>_N+1`. Pass a viewport shot or user ref as `imagePath`.
+- `workspace_transform_model` `{ source, op, height?, yaw? }` — headless Blender ground/height/yaw on an existing `lab-*_n.glb`.
 - `workspace_run_blender` `{ script, name }` — only `scripts/lab-*.py` (cube, lamb). Headless. Forbidden: `Blender.app`.
 - `workspace_commit_model` `{ name, exportPath }`
 - `workspace_list_assets`

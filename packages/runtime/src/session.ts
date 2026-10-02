@@ -3,6 +3,8 @@ import { AppServerClient, type JsonRpcId } from "./appserver-client.ts";
 import { listAssets } from "./assets.ts";
 import { commitModel } from "./commit-model.ts";
 import { runBlenderScript } from "./run-blender.ts";
+import { runEdit3d } from "./run-edit.ts";
+import { runTransform } from "./run-transform.ts";
 import { runTripo } from "./run-tripo.ts";
 
 export type SessionEvents = {
@@ -111,7 +113,18 @@ export class AgentSession {
     if (method === ServerMethod.toolCall) {
       const p = params as {
         tool?: string;
-        arguments?: { name?: string; exportPath?: string; prompt?: string; script?: string };
+        arguments?: {
+          name?: string;
+          exportPath?: string;
+          prompt?: string;
+          script?: string;
+          family?: string;
+          imagePath?: string;
+          source?: string;
+          op?: string;
+          height?: number;
+          yaw?: number;
+        };
       };
       try {
         const dest = this.runHostTool(p.tool ?? "", p.arguments ?? {});
@@ -161,13 +174,44 @@ export class AgentSession {
 
   private runHostTool(
     tool: string,
-    args: { name?: string; exportPath?: string; prompt?: string; script?: string },
+    args: {
+      name?: string;
+      exportPath?: string;
+      prompt?: string;
+      script?: string;
+      family?: string;
+      imagePath?: string;
+      source?: string;
+      op?: string;
+      height?: number;
+      yaw?: number;
+    },
   ): string {
     if (tool === HostTool.commitModel) {
       return commitModel(this.workspace, args.name ?? "model", args.exportPath ?? "");
     }
     if (tool === HostTool.generate3d) {
-      return runTripo(this.workspace, args.prompt ?? "a 3d model", args.name ?? "gen");
+      return runTripo(
+        this.workspace,
+        args.prompt ?? "a 3d model",
+        args.name ?? "gen",
+        args.imagePath,
+      );
+    }
+    if (tool === HostTool.edit3d) {
+      return runEdit3d(this.workspace, {
+        prompt: args.prompt ?? "",
+        family: args.family ?? args.name ?? "",
+        imagePath: args.imagePath,
+      });
+    }
+    if (tool === HostTool.transformModel) {
+      return runTransform(this.workspace, {
+        source: args.source ?? "",
+        op: (args.op as "ground" | "height" | "yaw") ?? "ground",
+        height: args.height,
+        yaw: args.yaw,
+      });
     }
     if (tool === HostTool.runBlender) {
       return runBlenderScript(this.workspace, args.script ?? "lab-cube.py", args.name ?? "model");
@@ -222,11 +266,46 @@ function hostTools(): unknown[] {
       type: "function",
       name: HostTool.generate3d,
       description:
-        "Generate a GLB from a text prompt via the host Tripo CLI (proxy included). Never run Blender.app or tripo in the shell.",
+        "Generate a GLB from text, or from an uploaded image (imagePath) via the host Tripo CLI. Never run Blender.app or tripo in the shell.",
       inputSchema: {
         type: "object",
-        properties: { prompt: { type: "string" }, name: { type: "string" } },
+        properties: {
+          prompt: { type: "string" },
+          name: { type: "string" },
+          imagePath: { type: "string" },
+        },
         required: ["prompt", "name"],
+      },
+    },
+    {
+      type: "function",
+      name: HostTool.edit3d,
+      description:
+        "Edit the current family: image-to-image then image-to-model, commit lab-<family>_N+1. Pass family plus prompt; optional imagePath (viewport shot or user ref). Never run tripo or Blender.app in the shell.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          prompt: { type: "string" },
+          family: { type: "string" },
+          imagePath: { type: "string" },
+        },
+        required: ["prompt", "family"],
+      },
+    },
+    {
+      type: "function",
+      name: HostTool.transformModel,
+      description:
+        "Headless Blender: ground / height / yaw the current lab-*_n.glb and commit the next version. Forbidden: Blender.app GUI.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          source: { type: "string" },
+          op: { type: "string" },
+          height: { type: "number" },
+          yaw: { type: "number" },
+        },
+        required: ["source", "op"],
       },
     },
     {

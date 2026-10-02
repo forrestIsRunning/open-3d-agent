@@ -150,9 +150,37 @@ app.whenReady().then(async () => {
   ipcMain.handle("lab:runTripo", async (_e, prompt?: string) =>
     sendHost(EnvelopeMethod.runTripo, { prompt: prompt ?? "a cute low poly fox" }),
   );
-  ipcMain.handle("lab:generate", async (_e, payload: { prompt: string; name: string }) =>
-    sendHost(EnvelopeMethod.generate3d, payload),
+  ipcMain.handle(
+    "lab:generate",
+    async (_e, payload: { prompt: string; name: string; imagePath?: string }) =>
+      sendHost(EnvelopeMethod.generate3d, payload),
   );
+  ipcMain.handle("lab:importGlb", async (_e, b64: string, name = "import") => {
+    const dir = join(workspace, ".lab/inbox");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `upload-${Date.now()}.glb`);
+    writeFileSync(file, Buffer.from(b64, "base64"));
+    return sendHost(EnvelopeMethod.commitModel, { name, exportPath: file });
+  });
+  ipcMain.handle(
+    "lab:edit",
+    async (_e, payload: { prompt: string; family: string; imagePath?: string }) =>
+      sendHost(EnvelopeMethod.edit3d, payload),
+  );
+  ipcMain.handle(
+    "lab:transform",
+    async (_e, payload: { source: string; op: string; height?: number; yaw?: number }) =>
+      sendHost(EnvelopeMethod.transformModel, payload),
+  );
+  ipcMain.handle("lab:saveRef", async (_e, b64: string, ext = "png") => {
+    const dir = join(workspace, ".lab/refs");
+    mkdirSync(dir, { recursive: true });
+    const safe = ext.replace(/[^a-z0-9]/gi, "") || "png";
+    const name = `ref-${Date.now()}.${safe}`;
+    const file = join(dir, name);
+    writeFileSync(file, Buffer.from(b64, "base64"));
+    return { name, path: file };
+  });
   ipcMain.handle("lab:listAssets", async () => sendHost(EnvelopeMethod.listAssets, {}));
   ipcMain.handle("lab:saveImage", async (_e, rel: string, b64: string) => {
     const name = String(rel).replace(/^.*\//, "");
@@ -162,6 +190,15 @@ app.whenReady().then(async () => {
     const file = join(dir, name);
     writeFileSync(file, Buffer.from(b64, "base64"));
     return { path: file };
+  });
+  ipcMain.handle("lab:readLabImage", async (_e, rel: string) => {
+    const clean = String(rel).replace(/^\/+/, "");
+    if (!clean.startsWith(".lab/") || !/\.(png|jpe?g|webp)$/i.test(clean)) {
+      throw new Error("bad lab image");
+    }
+    const file = join(workspace, clean);
+    if (!file.startsWith(workspace) || !existsSync(file)) return {};
+    return { b64: readFileSync(file).toString("base64"), path: file };
   });
   ipcMain.handle("lab:readImage", async (_e, name: string) => {
     const base = String(name).replace(/^.*\//, "").replace(/\.glb$/i, ".png");

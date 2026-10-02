@@ -28,6 +28,8 @@ export const EnvelopeMethod = {
   runLamb: "workspace.runLamb",
   runTripo: "workspace.runTripo",
   generate3d: "workspace.generate3d",
+  edit3d: "workspace.edit3d",
+  transformModel: "workspace.transformModel",
   listAssets: "workspace.listAssets",
 } as const;
 
@@ -39,5 +41,6 @@ export const EnvelopeEventMethod = {
   approvalNeeded: "approval.needed",
   userInputNeeded: "userInput.needed",
   modelReady: "model.ready",
+  editConcept: "edit.concept",
   log: "runtime.log",
 } as const;

@@ -9,10 +9,18 @@ contextBridge.exposeInMainWorld("lab", {
   runCube: () => ipcRenderer.invoke("lab:runCube"),
   runLamb: () => ipcRenderer.invoke("lab:runLamb"),
   runTripo: (prompt?: string) => ipcRenderer.invoke("lab:runTripo", prompt),
-  generate: (prompt: string, name: string) => ipcRenderer.invoke("lab:generate", { prompt, name }),
+  generate: (prompt: string, name: string, imagePath?: string) =>
+    ipcRenderer.invoke("lab:generate", { prompt, name, imagePath }),
+  importGlb: (b64: string, name?: string) => ipcRenderer.invoke("lab:importGlb", b64, name),
+  edit: (prompt: string, family: string, imagePath?: string) =>
+    ipcRenderer.invoke("lab:edit", { prompt, family, imagePath }),
+  transform: (source: string, op: string, extra?: { height?: number; yaw?: number }) =>
+    ipcRenderer.invoke("lab:transform", { source, op, ...extra }),
+  saveRef: (b64: string, ext?: string) => ipcRenderer.invoke("lab:saveRef", b64, ext),
   listAssets: () => ipcRenderer.invoke("lab:listAssets"),
   saveImage: (name: string, b64: string) => ipcRenderer.invoke("lab:saveImage", name, b64),
   readImage: (name: string) => ipcRenderer.invoke("lab:readImage", name),
+  readLabImage: (rel: string) => ipcRenderer.invoke("lab:readLabImage", rel),
   saveShot: (b64: string) => ipcRenderer.invoke("lab:saveShot", b64),
   deleteAsset: (name: string) => ipcRenderer.invoke("lab:deleteAsset", name),
   stop: () => ipcRenderer.invoke("lab:stop"),
