@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="220" viewBox="0 0 880 220" role="img" aria-label="Open 3D Agent architecture">
+  <style>
+    .box { fill: #161a22; stroke: #3a4254; stroke-width: 1.5; }
+    .you { fill: #1e3a2f; stroke: #3dd68c; }
+    .llm { fill: #2a2418; stroke: #f4a261; }
+    .t { font: 600 14px ui-sans-serif, system-ui, sans-serif; fill: #e8ecf3; }
+    .s { font: 12px ui-sans-serif, system-ui, sans-serif; fill: #8b95a7; }
+    .arr { stroke: #5b6b88; stroke-width: 1.6; fill: none; marker-end: url(#a); }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#5b6b88"/>
+    </marker>
+  </defs>
+  <rect class="box you" x="16" y="70" width="120" height="72" rx="10"/>
+  <text class="t" x="76" y="102" text-anchor="middle">You</text>
+  <text class="s" x="76" y="120" text-anchor="middle">chat · files</text>
+
+  <path class="arr" d="M144,106 H200"/>
+
+  <rect class="box" x="208" y="54" width="168" height="104" rx="10"/>
+  <text class="t" x="292" y="92" text-anchor="middle">Desktop</text>
+  <text class="s" x="292" y="112" text-anchor="middle">Electron · Vue · Three</text>
+  <text class="s" x="292" y="130" text-anchor="middle">stage + filmstrip</text>
+
+  <path class="arr" d="M376,86 H430"/>
+  <path class="arr" d="M292,158 V186 H520 V150"/>
+
+  <rect class="box" x="438" y="28" width="176" height="72" rx="10"/>
+  <text class="t" x="526" y="58" text-anchor="middle">Host</text>
+  <text class="s" x="526" y="78" text-anchor="middle">owns tools, not the LLM</text>
+
+  <rect class="box llm" x="438" y="150" width="176" height="52" rx="10"/>
+  <text class="t" x="526" y="172" text-anchor="middle">LLM</text>
+  <text class="s" x="526" y="188" text-anchor="middle">talk / check only</text>
+
+  <path class="arr" d="M614,64 H668"/>
+
+  <rect class="box" x="676" y="16" width="184" height="188" rx="10"/>
+  <text class="t" x="768" y="52" text-anchor="middle">Make the mesh</text>
+  <text class="s" x="768" y="80" text-anchor="middle">Tripo → generate / edit</text>
+  <text class="s" x="768" y="100" text-anchor="middle">Blender → cube / scale</text>
+  <text class="s" x="768" y="132" text-anchor="middle">lab-name_N.glb</text>
+  <text class="s" x="768" y="152" text-anchor="middle">back on stage</text>
+</svg>
