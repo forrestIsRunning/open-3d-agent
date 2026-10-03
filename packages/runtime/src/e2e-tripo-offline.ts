@@ -15,7 +15,7 @@ seedWorkspace(ws);
 mkdirSync(join(ws, ".lab"), { recursive: true });
 let threw = false;
 try {
-  runTripo(ws, "offline puppy", "puppy");
+  await runTripo(ws, "offline puppy", "puppy");
 } catch (err) {
   threw = true;
   const msg = String(err);

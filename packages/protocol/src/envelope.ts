@@ -37,6 +37,7 @@ export const EnvelopeMethod = {
   sessionNew: "session.new",
   sessionOpen: "session.open",
   sessionAppend: "session.append",
+  jobCancel: "job.cancel",
 } as const;
 
 export const EnvelopeEventMethod = {

@@ -16,7 +16,7 @@ import { runCube, runLamb } from "./run-cube.ts";
 import { runEdit3d } from "./run-edit.ts";
 import { runFillHoles } from "./run-repair.ts";
 import { runTransform } from "./run-transform.ts";
-import { runTripo } from "./run-tripo.ts";
+import { cancelActiveJob, runTripo } from "./run-tripo.ts";
 import { openLabDb, type LabDb } from "./lab-db.ts";
 
 loadDotenv();
@@ -27,6 +27,13 @@ function emit(method: string, params: unknown): void {
 
 function progress(step: string, hint: string): void {
   emit(EnvelopeEventMethod.jobProgress, { step, hint });
+}
+
+function newChatTitle(): string {
+  const d = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  return `New chat ${hh}:${mm}`;
 }
 
 function reply(id: unknown, result: unknown): void {
@@ -156,10 +163,14 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
     if (text) db.addMessage(role, text);
     return { sessionId: db.currentSessionId(), sessions: db.listSessions() };
   }
+  if (method === EnvelopeMethod.jobCancel) {
+    const killed = cancelActiveJob();
+    return { ok: killed };
+  }
   if (method === EnvelopeMethod.sessionNew) {
     if (!session || !db) throw new Error("runtime not started");
     const threadId = await session.newThread();
-    const created = db.createSession(threadId, "New chat");
+    const created = db.createSession(threadId, newChatTitle());
     return {
       threadId,
       sessionId: created.id,
@@ -218,7 +229,7 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
   }
   if (method === EnvelopeMethod.runTripo) {
     progress("Tripo · text-to-3D", "Host is calling tripo make. Often 1–3 minutes.");
-    const dest = runTripo(workspace, String(params.prompt ?? "a cute low poly fox"), String(params.name ?? "fox"));
+    const dest = await runTripo(workspace, String(params.prompt ?? "a cute low poly fox"), String(params.name ?? "fox"));
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }
@@ -230,7 +241,7 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
         ? "Host is meshing from the attached image. Often 1–3 minutes."
         : "Host is calling tripo make. The current mesh stays on stage until the new GLB lands.",
     );
-    const dest = runTripo(
+    const dest = await runTripo(
       workspace,
       String(params.prompt ?? "a 3d model"),
       String(params.name ?? "gen"),
@@ -242,7 +253,7 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
   }
   if (method === EnvelopeMethod.edit3d) {
     progress("Tripo · image-to-image", "Restyling a concept from the condition shot.");
-    const dest = runEdit3d(workspace, {
+    const dest = await runEdit3d(workspace, {
       prompt: String(params.prompt ?? ""),
       family: String(params.family ?? ""),
       imagePath: params.imagePath ? String(params.imagePath) : undefined,

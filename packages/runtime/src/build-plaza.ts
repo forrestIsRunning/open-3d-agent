@@ -59,7 +59,7 @@ for (const c of CAST) {
     continue;
   }
   console.log("TRIP0", c.name);
-  const dest = runTripo(ws, c.prompt, c.name);
+  const dest = await runTripo(ws, c.prompt, c.name);
   console.log("OK", dest, statSync(dest).size);
 }
 

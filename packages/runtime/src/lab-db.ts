@@ -128,7 +128,7 @@ export class LabDb {
 
   private maybeTitle(sessionId: number, text: string): void {
     const s = this.getSession(sessionId);
-    if (!s || (s.title !== "New chat" && s.title !== "Chat")) return;
+    if (!s || (s.title !== "New chat" && s.title !== "Chat" && !/^New chat \d/.test(s.title))) return;
     let line = text.trim();
     const user = line.split("\nUser: ").pop();
     if (user) line = user.trim();

@@ -16,6 +16,7 @@ declare global {
       }>;
       send: (text: string) => Promise<unknown>;
       remember: (role: string, text: string) => Promise<{ sessionId?: number; sessions?: Array<{ id: number; title: string }> }>;
+      cancel: () => Promise<{ ok?: boolean }>;
       sessionList: () => Promise<{
         messages?: Array<{ role: string; text: string }>;
         lastAsset?: string;

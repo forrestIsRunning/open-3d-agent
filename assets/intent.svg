@@ -16,18 +16,18 @@
   <text class="s" x="116" y="148" text-anchor="middle">align to ground</text>
   <text class="s" x="116" y="172" text-anchor="middle">fill unintended holes</text>
   <text class="s" x="116" y="196" text-anchor="middle">build a navigable space</text>
-  <text class="s" x="116" y="220" text-anchor="middle">what is on stage?</text>
+  <text class="s" x="116" y="220" text-anchor="middle">introduce this model</text>
   <text class="s" x="116" y="244" text-anchor="middle">animate these characters</text>
-  <rect class="box ok" x="248" y="44" width="320" height="168" rx="10"/>
+  <rect class="box ok" x="248" y="44" width="320" height="152" rx="10"/>
   <text class="h" x="408" y="72" text-anchor="middle">Fast path → host</text>
   <text class="s" x="408" y="100" text-anchor="middle">generate → workspace_generate_3d</text>
   <text class="s" x="408" y="124" text-anchor="middle">edit → workspace_edit_3d</text>
   <text class="s" x="408" y="148" text-anchor="middle">transform → workspace_transform_model</text>
-  <text class="s" x="408" y="172" text-anchor="middle">repair → workspace_fill_holes</text>
-  <text class="s" x="408" y="196" text-anchor="middle">plaza → workspace_run_plaza</text>
-  <rect class="box chat" x="248" y="224" width="320" height="56" rx="10"/>
-  <text class="s" x="408" y="248" text-anchor="middle" fill="#e8ecf3">chat → Codex turn/start</text>
-  <text class="s" x="408" y="266" text-anchor="middle">may still call workspace_*</text>
+  <text class="s" x="408" y="172" text-anchor="middle">repair / plaza → host scripts</text>
+  <rect class="box chat" x="248" y="208" width="320" height="72" rx="10"/>
+  <text class="h" x="408" y="232" text-anchor="middle">Talk path → Codex</text>
+  <text class="s" x="408" y="254" text-anchor="middle">describe / 介绍 / what is this</text>
+  <text class="s" x="408" y="270" text-anchor="middle">no Tripo; may still call workspace_*</text>
   <rect class="box no" x="592" y="44" width="312" height="236" rx="10"/>
   <text class="h" x="748" y="72" text-anchor="middle">unsupported (no tool)</text>
   <text class="s" x="748" y="108" text-anchor="middle">character animation / timing</text>

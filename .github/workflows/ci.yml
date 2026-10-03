@@ -17,3 +17,4 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm --filter @lab3d/runtime test
+      - run: node --experimental-strip-types --test apps/desktop/src/renderer/md.test.ts

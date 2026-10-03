@@ -8,7 +8,7 @@ loadDotenv();
 const ws = join(repoRoot, "tmp-ws");
 seedWorkspace(ws);
 mkdirSync(join(ws, ".lab"), { recursive: true });
-const dest = runTripo(ws, "a cute low poly fox, simple");
+const dest = await runTripo(ws, "a cute low poly fox, simple");
 const n = statSync(dest).size;
 if (n < 200) throw new Error(`tripo glb too small: ${n} ${dest}`);
 console.log("TRIPO_OK", dest, n);

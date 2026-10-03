@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("lab", {
   open: () => ipcRenderer.invoke("lab:open"),
   send: (text: string) => ipcRenderer.invoke("lab:send", text),
   remember: (role: string, text: string) => ipcRenderer.invoke("lab:remember", { role, text }),
+  cancel: () => ipcRenderer.invoke("lab:cancel"),
   sessionList: () => ipcRenderer.invoke("lab:sessionList"),
   sessionNew: () => ipcRenderer.invoke("lab:sessionNew"),
   sessionOpen: (id: number) => ipcRenderer.invoke("lab:sessionOpen", id),

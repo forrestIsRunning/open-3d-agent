@@ -235,6 +235,18 @@ async function newChat(): Promise<void> {
   }
 }
 
+async function cancelJob(): Promise<void> {
+  try {
+    const r = await window.lab.cancel();
+    messages.value.push({
+      role: "system",
+      text: r?.ok ? "Cancelled the mesh job." : "Nothing to cancel (job already finished).",
+    });
+  } catch (err) {
+    messages.value.push({ role: "system", text: `Cancel failed: ${String(err)}` });
+  }
+}
+
 async function onSessionChange(ev: Event): Promise<void> {
   if (busy.value) return;
   const id = Number((ev.target as HTMLSelectElement).value);
@@ -649,6 +661,7 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
           <strong>{{ activity.title }}</strong>
           <em>{{ activity.step }} · {{ elapsed }}</em>
         </div>
+        <button v-if="busy" type="button" class="stop" @click="cancelJob">Cancel</button>
       </div>
       <div v-else-if="jobs.length" class="jobs">
         <div v-for="j in jobs.slice(-3)" :key="j.id" class="job" :class="j.status">{{ j.label }} · {{ j.status }}</div>
@@ -976,6 +989,14 @@ form input:focus { border-color: #5b6b88; }
   border: 1px solid #7a4e28;
   background: #24180f;
   border-radius: 10px;
+}
+.now > div { flex: 1; min-width: 0; }
+.stop {
+  flex: none;
+  font-size: 11px;
+  padding: 5px 10px;
+  background: #7a2e2e;
+  color: #fff;
 }
 .now-dot {
   width: 8px;

@@ -37,6 +37,8 @@ Two paths hit the same host functions:
 
 Each **New** chat is a Codex `thread/start` plus a sqlite row. The desktop hydrates `.lab/lab.sqlite` on every `lab:open` (Ctrl+R included). Switching the dropdown `thread/resume`s that thread. The filmstrip is the workspace, not the thread.
 
+`job.cancel` SIGTERMs the in-flight `tripo` child. The current `lab-*_N.glb` stays on stage.
+
 Same `runTripo` / `runEdit3d` / `runTransform` either way. The filmstrip always shows `family · vN` because `commitModel` is the only writer of workspace GLBs.
 
 ## Why tools instead of a shell

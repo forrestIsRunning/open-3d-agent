@@ -1,8 +1,28 @@
-import { spawnSync } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { commitModel } from "./commit-model.ts";
 import { extraPath, labProxyEnv, tripoBin } from "./spawn-paths.ts";
+
+let active: ChildProcess | null = null;
+
+export function cancelActiveJob(): boolean {
+  if (!active) return false;
+  const child = active;
+  try {
+    child.kill("SIGTERM");
+  } catch {
+    return false;
+  }
+  setTimeout(() => {
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      /* already gone */
+    }
+  }, 1500);
+  return true;
+}
 
 export function findGlb(dir: string): string | null {
   return findFile(dir, (n) => n.toLowerCase().endsWith(".glb"));
@@ -30,29 +50,62 @@ function findFile(dir: string, ok: (name: string) => boolean): string | null {
   return null;
 }
 
-export function spawnTripo(workspace: string, args: string[], outDir: string): void {
+export function spawnTripo(workspace: string, args: string[], outDir: string): Promise<void> {
   mkdirSync(outDir, { recursive: true });
-  const r = spawnSync(tripoBin(), [...args, "--yes", "--quiet", "--no-open", "-o", outDir], {
-    cwd: workspace,
-    encoding: "utf8",
-    env: { ...process.env, PATH: extraPath(), ...labProxyEnv() },
-    timeout: Number(process.env.LAB_TRIPO_TIMEOUT_MS ?? 600_000),
+  const timeoutMs = Number(process.env.LAB_TRIPO_TIMEOUT_MS ?? 600_000);
+  return new Promise((resolve, reject) => {
+    const child = spawn(tripoBin(), [...args, "--yes", "--quiet", "--no-open", "-o", outDir], {
+      cwd: workspace,
+      env: { ...process.env, PATH: extraPath(), ...labProxyEnv() },
+    });
+    active = child;
+    let stderr = "";
+    let stdout = "";
+    child.stderr?.on("data", (d) => {
+      stderr += String(d);
+    });
+    child.stdout?.on("data", (d) => {
+      stdout += String(d);
+    });
+    const timer = setTimeout(() => {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        /* ignore */
+      }
+    }, timeoutMs);
+    const done = (err?: Error) => {
+      clearTimeout(timer);
+      if (active === child) active = null;
+      if (err) reject(err);
+      else resolve();
+    };
+    child.on("error", (err) => done(err));
+    child.on("close", (code, signal) => {
+      if (signal === "SIGTERM" || signal === "SIGKILL") {
+        done(new Error("cancelled"));
+        return;
+      }
+      if (code !== 0) {
+        const why = signal ? `tripo signal ${signal}` : `tripo exit ${code}`;
+        done(new Error((stderr || stdout || why).slice(0, 2000)));
+        return;
+      }
+      if (!findGlb(outDir) && !findImage(outDir)) {
+        done(new Error((stderr || stdout || "tripo wrote no glb/image").slice(0, 2000)));
+        return;
+      }
+      done();
+    });
   });
-  if (r.status !== 0) {
-    const why = r.signal ? `tripo signal ${r.signal}` : `tripo exit ${r.status}`;
-    throw new Error((r.stderr || r.stdout || why).slice(0, 2000));
-  }
-  if (!findGlb(outDir) && !findImage(outDir)) {
-    throw new Error((r.stderr || r.stdout || "tripo wrote no glb/image").slice(0, 2000));
-  }
 }
 
-export function runTripo(
+export async function runTripo(
   workspace: string,
   prompt = "a cute low poly fox",
   name = "fox",
   imagePath?: string,
-): string {
+): Promise<string> {
   const outDir = join(workspace, "exports", `lab-tripo-${name}-${Date.now()}`);
   mkdirSync(outDir, { recursive: true });
   if (process.env.LAB_TRIPO_STUB === "1") {
@@ -62,13 +115,13 @@ export function runTripo(
   }
   if (imagePath) {
     if (!existsSync(imagePath)) throw new Error(`image missing: ${imagePath}`);
-    spawnTripo(
+    await spawnTripo(
       workspace,
       ["generate", "image-to-model", imagePath, "--prompt", prompt],
       outDir,
     );
   } else {
-    spawnTripo(workspace, ["make", prompt], outDir);
+    await spawnTripo(workspace, ["make", prompt], outDir);
   }
   const glb = findGlb(outDir);
   if (!glb) throw new Error("tripo did not write a glb under exports/lab-tripo");

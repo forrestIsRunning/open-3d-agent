@@ -151,6 +151,7 @@ app.whenReady().then(async () => {
   ipcMain.handle("lab:remember", async (_e, payload: { role: string; text: string }) =>
     sendHost(EnvelopeMethod.sessionAppend, payload),
   );
+  ipcMain.handle("lab:cancel", async () => sendHost(EnvelopeMethod.jobCancel, {}));
   ipcMain.handle("lab:approve", async (_e, payload: { id: string; result: unknown }) =>
     sendHost(EnvelopeMethod.approvalRespond, payload),
   );

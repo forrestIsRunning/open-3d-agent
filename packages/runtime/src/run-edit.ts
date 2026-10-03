@@ -50,7 +50,7 @@ function saveConcept(
   return rel;
 }
 
-export function runEdit3d(
+export async function runEdit3d(
   workspace: string,
   opts: {
     prompt: string;
@@ -58,7 +58,7 @@ export function runEdit3d(
     imagePath?: string;
     onConcept?: (rel: string) => void;
   },
-): string {
+): Promise<string> {
   const family = opts.family.replace(/[^a-zA-Z0-9_-]/g, "-").toLowerCase();
   if (!family) throw new Error("edit needs current family");
   const src = latestFamilyGlb(workspace, family);
@@ -74,7 +74,7 @@ export function runEdit3d(
   const glbDir = join(workspace, "exports", `lab-edit-glb-${family}-${stamp}`);
   mkdirSync(imgDir, { recursive: true });
   mkdirSync(glbDir, { recursive: true });
-  spawnTripo(
+  await spawnTripo(
     workspace,
     ["generate", "image-to-image", image, "--prompt", opts.prompt],
     imgDir,
@@ -82,7 +82,7 @@ export function runEdit3d(
   const edited = findImage(imgDir);
   if (!edited) throw new Error("tripo image-to-image wrote no image");
   saveConcept(workspace, family, edited, opts.onConcept);
-  spawnTripo(
+  await spawnTripo(
     workspace,
     ["generate", "image-to-model", edited, "--prompt", opts.prompt],
     glbDir,

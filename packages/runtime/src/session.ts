@@ -167,7 +167,7 @@ export class AgentSession {
         };
       };
       try {
-        const dest = this.runHostTool(p.tool ?? "", p.arguments ?? {});
+        const dest = await this.runHostTool(p.tool ?? "", p.arguments ?? {});
         if (p.tool !== HostTool.listAssets && dest.endsWith(".glb")) {
           this.opts.events?.onModelReady?.(dest);
         }
@@ -212,7 +212,7 @@ export class AgentSession {
     return {};
   }
 
-  private runHostTool(
+  private async runHostTool(
     tool: string,
     args: {
       name?: string;
@@ -231,7 +231,7 @@ export class AgentSession {
       return commitModel(this.workspace, args.name ?? "model", args.exportPath ?? "");
     }
     if (tool === HostTool.generate3d) {
-      return runTripo(
+      return await runTripo(
         this.workspace,
         args.prompt ?? "a 3d model",
         args.name ?? "gen",
@@ -239,7 +239,7 @@ export class AgentSession {
       );
     }
     if (tool === HostTool.edit3d) {
-      return runEdit3d(this.workspace, {
+      return await runEdit3d(this.workspace, {
         prompt: args.prompt ?? "",
         family: args.family ?? args.name ?? "",
         imagePath: args.imagePath,
