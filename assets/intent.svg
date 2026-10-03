@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="300" viewBox="0 0 920 300" role="img" aria-label="classifyIntent routing">
+  <style>
+    .t { font: 600 15px ui-sans-serif, system-ui, sans-serif; fill: #e8ecf3; }
+    .s { font: 12px ui-sans-serif, system-ui, sans-serif; fill: #8b95a7; }
+    .h { font: 600 12px ui-sans-serif, system-ui, sans-serif; fill: #e8ecf3; }
+    .box { fill: #161a22; stroke: #3a4254; stroke-width: 1.4; }
+    .ok { fill: #1e3a2f; stroke: #3dd68c; }
+    .no { fill: #2a2418; stroke: #f4a261; }
+    .chat { fill: #1a2030; stroke: #5b6b88; }
+  </style>
+  <text class="t" x="20" y="28">Desktop classifyIntent — first match wins</text>
+  <rect class="box" x="16" y="44" width="200" height="236" rx="10"/>
+  <text class="h" x="116" y="72" text-anchor="middle">You type</text>
+  <text class="s" x="116" y="100" text-anchor="middle">generate a husky</text>
+  <text class="s" x="116" y="124" text-anchor="middle">make the fur red</text>
+  <text class="s" x="116" y="148" text-anchor="middle">align to ground</text>
+  <text class="s" x="116" y="172" text-anchor="middle">fill unintended holes</text>
+  <text class="s" x="116" y="196" text-anchor="middle">build a navigable space</text>
+  <text class="s" x="116" y="220" text-anchor="middle">what is on stage?</text>
+  <text class="s" x="116" y="244" text-anchor="middle">animate these characters</text>
+  <rect class="box ok" x="248" y="44" width="320" height="168" rx="10"/>
+  <text class="h" x="408" y="72" text-anchor="middle">Fast path → host</text>
+  <text class="s" x="408" y="100" text-anchor="middle">generate → workspace_generate_3d</text>
+  <text class="s" x="408" y="124" text-anchor="middle">edit → workspace_edit_3d</text>
+  <text class="s" x="408" y="148" text-anchor="middle">transform → workspace_transform_model</text>
+  <text class="s" x="408" y="172" text-anchor="middle">repair → workspace_fill_holes</text>
+  <text class="s" x="408" y="196" text-anchor="middle">plaza → workspace_run_plaza</text>
+  <rect class="box chat" x="248" y="224" width="320" height="56" rx="10"/>
+  <text class="s" x="408" y="248" text-anchor="middle" fill="#e8ecf3">chat → Codex turn/start</text>
+  <text class="s" x="408" y="266" text-anchor="middle">may still call workspace_*</text>
+  <rect class="box no" x="592" y="44" width="312" height="236" rx="10"/>
+  <text class="h" x="748" y="72" text-anchor="middle">unsupported (no tool)</text>
+  <text class="s" x="748" y="108" text-anchor="middle">character animation / timing</text>
+  <text class="s" x="748" y="132" text-anchor="middle">printable miniature pack</text>
+  <text class="s" x="748" y="156" text-anchor="middle">N layout options</text>
+  <text class="s" x="748" y="180" text-anchor="middle">demo video</text>
+  <text class="s" x="748" y="204" text-anchor="middle">skinning weights</text>
+  <text class="s" x="748" y="228" text-anchor="middle">split + connectors</text>
+  <text class="s" x="748" y="256" text-anchor="middle">honest system line, no shell</text>
+</svg>

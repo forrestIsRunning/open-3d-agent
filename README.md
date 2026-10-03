@@ -45,7 +45,23 @@ Two ways to hit the same functions:
 | `workspace_commit_model` | Copy → `lab-<name>_N.glb` | Single versioning rule |
 | `workspace_list_assets` | List `lab-*.glb` | So the model can name what is on disk |
 
-Longer write-up: [`docs/how-it-works.md`](docs/how-it-works.md).
+### Intent routing
+
+The desktop matches **your sentence first**. Codex is not asked to pick a tool when the intent is already obvious.
+
+<p align="center">
+  <img src="assets/intent.svg" alt="classifyIntent: generate edit transform repair plaza go to host; chat goes to Codex; animation video skinning print are unsupported" width="920" />
+</p>
+
+### Versioning
+
+Every mesh write goes through `commitModel`. The stage subject is the **family**, not a new filename each time.
+
+<p align="center">
+  <img src="assets/versioning.svg" alt="lab-husky_1 generate, lab-husky_2 edit, lab-husky_3 fill holes, filmstrip husky v3" width="920" />
+</p>
+
+Workspace (`~/3d-agent-workspaces/default`): `lab-husky_1.glb`, `.lab/lab.sqlite` (chat), `.lab/thumbs/`, `scripts/lab-*.py`. Longer write-up: [`docs/how-it-works.md`](docs/how-it-works.md).
 
 ## Try it
 

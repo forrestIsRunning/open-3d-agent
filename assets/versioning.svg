@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="200" viewBox="0 0 920 200" role="img" aria-label="commitModel family versions">
+  <style>
+    .t { font: 600 15px ui-sans-serif, system-ui, sans-serif; fill: #e8ecf3; }
+    .s { font: 12px ui-sans-serif, system-ui, sans-serif; fill: #8b95a7; }
+    .h { font: 600 13px ui-sans-serif, system-ui, sans-serif; fill: #e8ecf3; }
+    .box { fill: #161a22; stroke: #3a4254; stroke-width: 1.4; }
+    .arr { stroke: #5b6b88; stroke-width: 1.5; fill: none; marker-end: url(#a); }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#5b6b88"/>
+    </marker>
+  </defs>
+  <text class="t" x="20" y="28">One writer: commitModel — family stays, N increments</text>
+  <rect class="box" x="16" y="48" width="200" height="88" rx="10"/>
+  <text class="h" x="116" y="84" text-anchor="middle">generate</text>
+  <text class="s" x="116" y="108" text-anchor="middle">lab-husky_1.glb</text>
+  <path class="arr" d="M216,92 H268"/>
+  <rect class="box" x="276" y="48" width="200" height="88" rx="10"/>
+  <text class="h" x="376" y="84" text-anchor="middle">edit fur</text>
+  <text class="s" x="376" y="108" text-anchor="middle">lab-husky_2.glb</text>
+  <path class="arr" d="M476,92 H528"/>
+  <rect class="box" x="536" y="48" width="200" height="88" rx="10"/>
+  <text class="h" x="636" y="84" text-anchor="middle">fill holes</text>
+  <text class="s" x="636" y="108" text-anchor="middle">lab-husky_3.glb</text>
+  <path class="arr" d="M736,92 H788"/>
+  <rect class="box" x="796" y="48" width="108" height="88" rx="10"/>
+  <text class="s" x="850" y="84" text-anchor="middle" fill="#e8ecf3">filmstrip</text>
+  <text class="s" x="850" y="108" text-anchor="middle">husky · v3</text>
+  <text class="s" x="460" y="172" text-anchor="middle">Wrong: a new generate named gen — conversation subject is lost. Edit/transform/repair must pass the current family.</text>
+</svg>

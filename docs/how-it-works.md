@@ -106,3 +106,33 @@ That is why the green **LIVE** badge is “Codex is up”, and why a FAKE mode c
 **Isolated Codex**
 
 `writeIsolatedCodexHome` writes in-repo `.codex-home/config.toml` (`wire_api = responses`, `OPENAI_BASE_URL` from env). The API key stays in `.env`, never in git.
+
+## Envelope (Electron ↔ host)
+
+JSONL on the host stdin/stdout, **not** Codex JSON-RPC. Codex JSON-RPC stays inside the host.
+
+| Envelope | Desktop IPC | Host |
+|---|---|---|
+| `workspace.generate3d` | `lab:generate` | `runTripo` |
+| `workspace.edit3d` | `lab:edit` | `runEdit3d` (emits `edit.concept` mid-job) |
+| `workspace.transformModel` | `lab:transform` | `runTransform` |
+| `workspace.fillHoles` | `lab:fillHoles` | `runFillHoles` |
+| `workspace.runPlaza` | `lab:plaza` | `lab-plaza.py` |
+| `turn.send` | `lab:send` | Codex `turn/start` |
+| `model.ready` | event | load GLB on stage |
+
+## On disk
+
+```text
+~/3d-agent-workspaces/default/
+  lab-husky_1.glb          committed versions
+  lab-husky_2.glb
+  AGENTS.md                copied from templates — Codex reads this
+  scripts/lab-*.py         allowlisted Blender
+  exports/                 Tripo/Blender scratch
+  .lab/lab.sqlite          UI transcript + last thread id
+  .lab/thumbs/             dark viewport frames for the filmstrip
+  .lab/concepts/           last edit concept image
+```
+
+Repo `.codex-home/` is isolated from `~/.codex`. `wire_api` must be `responses` for Codex 0.158.0.
