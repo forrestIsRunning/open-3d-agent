@@ -25,6 +25,10 @@ function emit(method: string, params: unknown): void {
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n");
 }
 
+function progress(step: string, hint: string): void {
+  emit(EnvelopeEventMethod.jobProgress, { step, hint });
+}
+
 function reply(id: unknown, result: unknown): void {
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n");
 }
@@ -68,6 +72,8 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
         model: loadConfig().model,
         messages: db?.listMessages() ?? [],
         lastAsset: db?.getMeta("lastAsset"),
+        sessionId: db?.currentSessionId(),
+        sessions: db?.listSessions() ?? [],
       };
     }
     const cfg = loadConfig();
@@ -118,6 +124,9 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
     });
     const init = await session.start();
     db.setMeta("threadId", session.threadId);
+    const cur = db.currentSessionId();
+    if (cur) db.bindThread(cur, session.threadId);
+    else db.createSession(session.threadId, "Chat");
     return {
       init,
       threadId: session.threadId,
@@ -126,12 +135,55 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
       approvalPolicy: cfg.approvalPolicy,
       messages: db.listMessages(),
       lastAsset: db.getMeta("lastAsset"),
+      sessionId: db.currentSessionId(),
+      sessions: db.listSessions(),
+    };
+  }
+  if (method === EnvelopeMethod.sessionList) {
+    if (!db) throw new Error("workspace not open");
+    return {
+      sessionId: db.currentSessionId(),
+      sessions: db.listSessions(),
+      messages: db.listMessages(),
+      lastAsset: db.getMeta("lastAsset"),
+      threadId: db.getMeta("threadId"),
+    };
+  }
+  if (method === EnvelopeMethod.sessionAppend) {
+    if (!db) throw new Error("workspace not open");
+    const role = String(params.role ?? "user");
+    const text = String(params.text ?? "").trim();
+    if (text) db.addMessage(role, text);
+    return { sessionId: db.currentSessionId(), sessions: db.listSessions() };
+  }
+  if (method === EnvelopeMethod.sessionNew) {
+    if (!session || !db) throw new Error("runtime not started");
+    const threadId = await session.newThread();
+    const created = db.createSession(threadId, "New chat");
+    return {
+      threadId,
+      sessionId: created.id,
+      sessions: db.listSessions(),
+      messages: [] as unknown[],
+    };
+  }
+  if (method === EnvelopeMethod.sessionOpen) {
+    if (!session || !db) throw new Error("runtime not started");
+    const opened = db.openSession(Number(params.id));
+    const threadId = opened.threadId
+      ? await session.resumeThread(opened.threadId)
+      : await session.newThread();
+    db.bindThread(opened.id, threadId);
+    return {
+      threadId,
+      sessionId: opened.id,
+      sessions: db.listSessions(),
+      messages: db.listMessages(opened.id),
     };
   }
   if (method === EnvelopeMethod.turnSend) {
     if (!session) throw new Error("runtime not started");
     const text = String(params.text ?? "");
-    db?.addMessage("user", text);
     return await session.send(text);
   }
   if (method === EnvelopeMethod.turnInterrupt) {
@@ -153,44 +205,62 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
     return { path: dest };
   }
   if (method === EnvelopeMethod.runCube) {
+    progress("Blender · cube", "Headless lab-cube.py; a few seconds.");
     const dest = runCube(workspace);
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }
   if (method === EnvelopeMethod.runLamb) {
+    progress("Blender · lamb", "Headless lab-lamb.py; a few seconds.");
     const dest = runLamb(workspace);
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }
   if (method === EnvelopeMethod.runTripo) {
+    progress("Tripo · text-to-3D", "Host is calling tripo make. Often 1–3 minutes.");
     const dest = runTripo(workspace, String(params.prompt ?? "a cute low poly fox"), String(params.name ?? "fox"));
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }
   if (method === EnvelopeMethod.generate3d) {
+    const fromImage = Boolean(params.imagePath);
+    progress(
+      fromImage ? "Tripo · image-to-3D" : "Tripo · text-to-3D",
+      fromImage
+        ? "Host is meshing from the attached image. Often 1–3 minutes."
+        : "Host is calling tripo make. The current mesh stays on stage until the new GLB lands.",
+    );
     const dest = runTripo(
       workspace,
       String(params.prompt ?? "a 3d model"),
       String(params.name ?? "gen"),
       params.imagePath ? String(params.imagePath) : undefined,
     );
+    progress("Commit GLB", "Writing the next lab-<name>_N.glb.");
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }
   if (method === EnvelopeMethod.edit3d) {
+    progress("Tripo · image-to-image", "Restyling a concept from the condition shot.");
     const dest = runEdit3d(workspace, {
       prompt: String(params.prompt ?? ""),
       family: String(params.family ?? ""),
       imagePath: params.imagePath ? String(params.imagePath) : undefined,
-      onConcept: (rel) => emit(EnvelopeEventMethod.editConcept, { path: rel, family: params.family }),
+      onConcept: (rel) => {
+        emit(EnvelopeEventMethod.editConcept, { path: rel, family: params.family });
+        progress("Tripo · image-to-3D", "Concept is ready. Meshing the next version of this family.");
+      },
     });
+    progress("Commit GLB", "Writing the next family version.");
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }
   if (method === EnvelopeMethod.transformModel) {
+    const op = (params.op as "ground" | "height" | "yaw") ?? "ground";
+    progress(`Blender · ${op}`, "Headless pose/scale on the current GLB.");
     const dest = runTransform(workspace, {
       source: String(params.source ?? ""),
-      op: (params.op as "ground" | "height" | "yaw") ?? "ground",
+      op,
       height: params.height != null ? Number(params.height) : undefined,
       yaw: params.yaw != null ? Number(params.yaw) : undefined,
     });
@@ -198,11 +268,13 @@ async function handle(method: string, params: Record<string, unknown>): Promise<
     return { path: dest };
   }
   if (method === EnvelopeMethod.runPlaza) {
+    progress("Blender · plaza", "Composing scaled lab-*.glb files into one scene.");
     const dest = runBlenderScript(workspace, "lab-plaza.py", "plaza");
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };
   }
   if (method === EnvelopeMethod.fillHoles) {
+    progress("Blender · fill holes", "Closing unintended holes on the current GLB.");
     const dest = runFillHoles(workspace, String(params.source ?? ""));
     emit(EnvelopeEventMethod.modelReady, { path: dest });
     return { path: dest };

@@ -20,12 +20,31 @@ test("T-no-shell-blender in AGENTS.md", async () => {
   assert.match(md, /workspace_transform_model/);
   assert.match(md, /workspace_fill_holes/);
   assert.match(md, /workspace_run_plaza/);
+  assert.match(md, /compact Markdown/);
+  assert.match(md, /menu of features/);
 });
 
 test("T-intent chat vs cube vs lamb", () => {
   assert.equal(classifyIntent("介绍一下自己").kind, "chat");
   assert.equal(classifyIntent("做一个立方体").kind, "blender-cube");
   assert.equal(classifyIntent("帮我做一只小羊").kind, "blender-lamb");
+});
+
+test("T-intent talk about the stage is chat, not generate", () => {
+  const talk = [
+    "你好。帮我介绍一下这个模型。",
+    "你看看现在的3d model。给介绍一下",
+    "介绍一下这个模型",
+    "这个模型是什么",
+    "Describe this model",
+    "你好。帮我介绍一下这个模型。Provide thorough, detailed responses that explore topics from multiple angles. Include relevant context, examples, nuances, and implications.",
+  ];
+  for (const line of talk) {
+    assert.equal(classifyIntent(line).kind, "chat", line.slice(0, 40));
+  }
+  assert.equal(classifyIntent("帮我生成一个小狗的3d model").kind, "generate");
+  assert.equal(classifyIntent("generate a husky").kind, "generate");
+  assert.equal(classifyIntent("make a 3d fox").kind, "generate");
 });
 
 test("T-intent edit vs generate vs transform", () => {

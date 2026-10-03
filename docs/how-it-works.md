@@ -30,8 +30,12 @@ So we split three jobs:
 
 Two paths hit the same host functions:
 
-1. **Fast path (desktop).** `classifyIntent` sees “generate a husky” / “make it red” / “align to ground” and calls `lab:generate` / `lab:edit` / `lab:transform` over IPC. Codex is only asked for a one-line recap after the GLB exists.
+1. **Fast path (desktop).** `classifyIntent` sees “generate a husky” / “make it red” / “align to ground” and calls `lab:generate` / `lab:edit` / `lab:transform` over IPC. Codex is only asked for a short Markdown recap after the GLB exists. Describe / 介绍 / “this model” is **chat**, not generate.
 2. **Talk path (Codex).** Free-form chat goes to `turn/start`. If the model needs a mesh, it emits `item/tool/call` with a `workspace_*` name. The host runs the tool and returns the new `lab-…glb` path as `inputText`.
+
+### Sessions
+
+Each **New** chat is a Codex `thread/start` plus a sqlite row. The desktop hydrates `.lab/lab.sqlite` on every `lab:open` (Ctrl+R included). Switching the dropdown `thread/resume`s that thread. The filmstrip is the workspace, not the thread.
 
 Same `runTripo` / `runEdit3d` / `runTransform` either way. The filmstrip always shows `family · vN` because `commitModel` is the only writer of workspace GLBs.
 

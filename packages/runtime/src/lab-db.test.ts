@@ -23,6 +23,35 @@ test("sqlite keeps messages across reopen", () => {
   b.close();
 });
 
+test("sessions isolate messages", () => {
+  const ws = mkdtempSync(join(tmpdir(), "lab3d-sess-"));
+  const db = openLabDb(ws);
+  db.addMessage("user", "hello husky");
+  const first = db.currentSessionId();
+  const next = db.createSession("thread-b", "New chat");
+  assert.notEqual(next.id, first);
+  assert.equal(db.listMessages().length, 0);
+  db.addMessage("user", "new topic");
+  assert.equal(db.listMessages().length, 1);
+  db.openSession(first);
+  assert.match(db.listMessages()[0]?.text ?? "", /hello husky/);
+  db.close();
+});
+
+test("session list snapshot keeps transcript", () => {
+  const ws = mkdtempSync(join(tmpdir(), "lab3d-snap-"));
+  const db = openLabDb(ws);
+  db.addMessage("user", "hi");
+  db.addMessage("agent", "**v2**");
+  const rows = db.listMessages();
+  assert.equal(rows.length, 2);
+  assert.equal(rows[1]?.text, "**v2**");
+  db.close();
+  const again = openLabDb(ws);
+  assert.equal(again.listMessages().length, 2);
+  again.close();
+});
+
 test("T-resume fake thread/resume by stored id", async () => {
   const ws = mkdtempSync(join(tmpdir(), "lab3d-"));
   seedWorkspace(ws);

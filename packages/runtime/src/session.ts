@@ -88,6 +88,45 @@ export class AgentSession {
     return init;
   }
 
+  private threadParams(): Record<string, unknown> {
+    return {
+      cwd: this.workspace,
+      model: this.opts.model,
+      approvalPolicy: this.opts.approvalPolicy ?? "never",
+      sandbox: this.opts.sandbox ?? "workspace-write",
+      ephemeral: false,
+      experimentalRawEvents: false,
+      dynamicTools: hostTools(),
+    };
+  }
+
+  async newThread(): Promise<string> {
+    const started = (await this.client.request(ClientMethod.threadStart, this.threadParams())) as {
+      thread?: { id?: string };
+    };
+    this.threadId = started.thread?.id ?? "";
+    if (!this.threadId) throw new Error("thread/start returned empty thread.id");
+    this.opts.threadId = this.threadId;
+    return this.threadId;
+  }
+
+  async resumeThread(threadId: string): Promise<string> {
+    try {
+      const resumed = (await this.client.request(ClientMethod.threadResume, {
+        threadId,
+        cwd: this.workspace,
+        model: this.opts.model,
+        approvalPolicy: this.opts.approvalPolicy ?? "never",
+        sandbox: this.opts.sandbox ?? "workspace-write",
+      })) as { thread?: { id?: string } };
+      this.threadId = resumed.thread?.id ?? threadId;
+    } catch {
+      return this.newThread();
+    }
+    this.opts.threadId = this.threadId;
+    return this.threadId;
+  }
+
   async send(text: string): Promise<{ turnId: string }> {
     const result = (await this.client.request(ClientMethod.turnStart, {
       threadId: this.threadId,

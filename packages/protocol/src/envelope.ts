@@ -33,6 +33,10 @@ export const EnvelopeMethod = {
   runPlaza: "workspace.runPlaza",
   fillHoles: "workspace.fillHoles",
   listAssets: "workspace.listAssets",
+  sessionList: "session.list",
+  sessionNew: "session.new",
+  sessionOpen: "session.open",
+  sessionAppend: "session.append",
 } as const;
 
 export const EnvelopeEventMethod = {
@@ -44,5 +48,6 @@ export const EnvelopeEventMethod = {
   userInputNeeded: "userInput.needed",
   modelReady: "model.ready",
   editConcept: "edit.concept",
+  jobProgress: "job.progress",
   log: "runtime.log",
 } as const;

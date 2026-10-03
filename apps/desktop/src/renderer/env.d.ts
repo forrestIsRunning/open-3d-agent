@@ -11,8 +11,29 @@ declare global {
         threadId?: string;
         messages?: Array<{ role: string; text: string }>;
         lastAsset?: string;
+        sessionId?: number;
+        sessions?: Array<{ id: number; title: string; threadId: string }>;
       }>;
       send: (text: string) => Promise<unknown>;
+      remember: (role: string, text: string) => Promise<{ sessionId?: number; sessions?: Array<{ id: number; title: string }> }>;
+      sessionList: () => Promise<{
+        messages?: Array<{ role: string; text: string }>;
+        lastAsset?: string;
+        sessionId: number;
+        sessions: Array<{ id: number; title: string; threadId: string }>;
+      }>;
+      sessionNew: () => Promise<{
+        threadId: string;
+        sessionId: number;
+        sessions: Array<{ id: number; title: string; threadId: string }>;
+        messages: Array<{ role: string; text: string }>;
+      }>;
+      sessionOpen: (id: number) => Promise<{
+        threadId: string;
+        sessionId: number;
+        sessions: Array<{ id: number; title: string; threadId: string }>;
+        messages: Array<{ role: string; text: string }>;
+      }>;
       approve: (id: string, result: unknown) => Promise<unknown>;
       latestModel: () => Promise<{ name?: string }>;
       readModel: (name: string) => Promise<{ name: string; b64: string }>;

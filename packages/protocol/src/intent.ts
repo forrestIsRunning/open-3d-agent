@@ -11,11 +11,15 @@ export type Intent =
   | { kind: "blender-repair" }
   | { kind: "unsupported"; reason: string };
 
+const BOILERPLATE = /Provide thorough, detailed responses[\s\S]*$/i;
+
 export function classifyIntent(text: string): Intent {
-  const t = text.trim();
-  if (!t) return { kind: "chat" };
+  const raw = text.trim();
+  if (!raw) return { kind: "chat" };
+  const t = raw.replace(BOILERPLATE, "").trim() || raw;
   const blocked = classifyUnsupported(t);
   if (blocked) return blocked;
+  if (isTalkNotMake(t)) return { kind: "chat" };
   if (/立方体|\bcube\b/i.test(t)) return { kind: "blender-cube" };
   if (/小羊|羔羊|\blamb\b|\bsheep\b/i.test(t) && !/改|换成|变成/.test(t)) {
     return { kind: "blender-lamb" };
@@ -27,9 +31,31 @@ export function classifyIntent(text: string): Intent {
   const xf = classifyTransform(t);
   if (xf) return xf;
   if (isEdit(t)) return { kind: "edit", prompt: t };
-  const wantsModel = /生成|文生|3d\s*model|3D 模型|模型|glb|\bmake\b|\bgenerate\b/i.test(t);
-  if (wantsModel) return { kind: "generate", prompt: t, name: guessName(t) };
+  if (wantsGenerate(t)) return { kind: "generate", prompt: t, name: guessName(t) };
   return { kind: "chat" };
+}
+
+/** Describe / Q&A about the mesh on stage — not a new Tripo job. */
+function isTalkNotMake(t: string): boolean {
+  const talk =
+    /介绍|描述|看看|讲讲|这是什么|是什么|什么样|什么样子|帮我介绍|tell me about|describe |what is this/i.test(
+      t,
+    );
+  const making =
+    /生成|做一个|做一只|新建|文生|make a |generate a |create a |图生|image-to-3d/i.test(t);
+  return talk && !making;
+}
+
+function wantsGenerate(t: string): boolean {
+  return (
+    /生成/.test(t) ||
+    /文生/.test(t) ||
+    /做一个|做一只|新建/.test(t) ||
+    /make (a |me a |an )/i.test(t) ||
+    /generate (a |an )/i.test(t) ||
+    /create a .{0,80}3d/i.test(t) ||
+    /(3d\s*model|glb).{0,12}(生成|make|create|generate)/i.test(t)
+  );
 }
 
 function classifyUnsupported(t: string): Intent | null {

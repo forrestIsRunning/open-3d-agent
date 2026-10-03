@@ -112,8 +112,6 @@ app.whenReady().then(async () => {
           model?: string;
           approvalPolicy?: string;
           threadId?: string;
-          messages?: Array<{ role: string; text: string }>;
-          lastAsset?: string;
         };
         return {
           workspace,
@@ -121,14 +119,38 @@ app.whenReady().then(async () => {
           model: started.model,
           approvalPolicy: started.approvalPolicy,
           threadId: started.threadId,
-          messages: started.messages ?? [],
-          lastAsset: started.lastAsset,
         };
       })();
     }
-    return sessionReady;
+    const boot = await sessionReady;
+    let snap: {
+      threadId?: string;
+      messages?: Array<{ role: string; text: string }>;
+      lastAsset?: string;
+      sessionId?: number;
+      sessions?: Array<{ id: number; title: string; threadId: string }>;
+    } = {};
+    try {
+      snap = (await sendHost(EnvelopeMethod.sessionList, {})) as typeof snap;
+    } catch {
+      snap = { sessions: [], messages: [] };
+    }
+    return {
+      ...boot,
+      threadId: snap.threadId ?? boot.threadId,
+      messages: snap.messages ?? [],
+      lastAsset: snap.lastAsset,
+      sessionId: snap.sessionId,
+      sessions: snap.sessions ?? [],
+    };
   });
   ipcMain.handle("lab:send", async (_e, text: string) => sendHost(EnvelopeMethod.turnSend, { text }));
+  ipcMain.handle("lab:sessionList", async () => sendHost(EnvelopeMethod.sessionList, {}));
+  ipcMain.handle("lab:sessionNew", async () => sendHost(EnvelopeMethod.sessionNew, {}));
+  ipcMain.handle("lab:sessionOpen", async (_e, id: number) => sendHost(EnvelopeMethod.sessionOpen, { id }));
+  ipcMain.handle("lab:remember", async (_e, payload: { role: string; text: string }) =>
+    sendHost(EnvelopeMethod.sessionAppend, payload),
+  );
   ipcMain.handle("lab:approve", async (_e, payload: { id: string; result: unknown }) =>
     sendHost(EnvelopeMethod.approvalRespond, payload),
   );

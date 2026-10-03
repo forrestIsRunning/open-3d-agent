@@ -14,6 +14,18 @@ Chat on the left. A live GLB stage on the right. You talk; the **host** builds t
 
 <p align="center"><sub>Same family: <code>generate a Siberian husky</code> → <code>change the fur to golden-red</code> → <code>husky · v2</code></sub></p>
 
+## Features
+
+| | |
+|---|---|
+| **Chat + live stage** | Left rail is the agent. Right is a Three.js GLB viewport, filmstrip, lights, compare, lookbook. |
+| **Host-owned 3D** | Text-to-3D, image-to-3D, restyle (same family, next version), ground/height/yaw, fill holes, plaza. Tripo + headless Blender only. |
+| **Intent routing** | “Generate a husky” runs Tripo. “Introduce this model” / describe-the-stage is **chat**, not a new mesh. Edit / transform / plaza / repair match first. |
+| **Markdown replies** | Agent bubbles render compact Markdown (`**v2**`, `` `lab-husky_2.glb` ``, short lists). |
+| **Job status** | Rail + HUD show the real step (`Tripo · text-to-3D`, recap) and elapsed time. The current mesh stays on stage until the new GLB commits. Chat stays usable. |
+| **Sessions** | `New` starts a Codex thread. Dropdown switches transcripts. History lives in `.lab/lab.sqlite` and reloads after Ctrl+R. Assets stay on the workspace filmstrip. |
+| **Upload** | Drop / paste / **+** for a reference image (image-to-3D or edit condition) or a GLB. |
+
 ## How it works
 
 <p align="center">

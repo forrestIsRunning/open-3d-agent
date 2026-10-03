@@ -3,6 +3,10 @@ import { contextBridge, ipcRenderer } from "electron";
 contextBridge.exposeInMainWorld("lab", {
   open: () => ipcRenderer.invoke("lab:open"),
   send: (text: string) => ipcRenderer.invoke("lab:send", text),
+  remember: (role: string, text: string) => ipcRenderer.invoke("lab:remember", { role, text }),
+  sessionList: () => ipcRenderer.invoke("lab:sessionList"),
+  sessionNew: () => ipcRenderer.invoke("lab:sessionNew"),
+  sessionOpen: (id: number) => ipcRenderer.invoke("lab:sessionOpen", id),
   approve: (id: string, result: unknown) => ipcRenderer.invoke("lab:approve", { id, result }),
   latestModel: () => ipcRenderer.invoke("lab:latestModel"),
   readModel: (name: string) => ipcRenderer.invoke("lab:readModel", name),

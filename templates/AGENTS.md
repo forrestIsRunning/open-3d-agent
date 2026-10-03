@@ -26,4 +26,11 @@ If a host tool fails, report the error. Do not fall back to writing a new Blende
 
 ## Chat
 
-Reply in English. Keep answers short. After a host tool succeeds, mention the `lab-<name>_<n>.glb` filename.
+Reply in English. Use compact Markdown (bold, `code`, short bullets). No tables.
+
+When the user asks about the model on stage:
+- First line: **name · vN** and `` `lab-<name>_<n>.glb` ``
+- Then 2–4 bullets: silhouette, materials/colors, pose. Do not invent topology counts.
+- Do not end with a menu of features (“want me to restyle / plaza / generate…”) unless they asked what you can do.
+
+After a host tool succeeds, one title line plus at most three bullets. Mention the new filename in `code`.

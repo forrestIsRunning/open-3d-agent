@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { classifyIntent, parseAssetName } from "@lab3d/protocol";
+import { renderMd } from "./md.ts";
 import {
   captureAfterPaint,
   capturePng,
@@ -15,6 +16,7 @@ import {
 } from "./viewer.ts";
 
 type Msg = { role: "user" | "agent" | "tool" | "system"; text: string };
+type Activity = { title: string; step: string; hint: string; startedAt: number };
 
 const messages = ref<Msg[]>([]);
 const input = ref("");
@@ -32,8 +34,25 @@ const look = ref<{ before: string; concept: string; after: string; open: boolean
   after: "",
   open: false,
 });
-const veilLabel = ref("Working…");
+const activity = ref<Activity | null>(null);
+const nowTick = ref(Date.now());
 const stageTitle = computed(() => (assetName.value ? parseAssetName(assetName.value).label : "empty stage"));
+const elapsed = computed(() => {
+  if (!activity.value) return "";
+  const s = Math.max(0, Math.floor((nowTick.value - activity.value.startedAt) / 1000));
+  if (s < 60) return `${s}s`;
+  return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+});
+const hudStatus = computed(() => {
+  if (activity.value) return `${activity.value.step} · ${elapsed.value}`;
+  if (waiting.value) return "Agent is writing…";
+  return "";
+});
+const composerPlaceholder = computed(() => {
+  if (activity.value) return `${activity.value.title} — chat still works`;
+  if (pendingImage.value) return "Image attached — send or say make it red";
+  return "What 3D model do you want?";
+});
 const ready = ref(false);
 const busy = ref(false);
 const fake = ref<boolean | null>(null);
@@ -44,12 +63,24 @@ const assetName = ref("");
 const waiting = ref(false);
 const assets = ref<string[]>([]);
 const jobs = ref<{ id: number; label: string; status: string }[]>([]);
+const sessions = ref<Array<{ id: number; title: string; threadId: string }>>([]);
+const sessionId = ref<number>(0);
 let jobSeq = 1;
 const approval = ref<{ id: string; text: string } | null>(null);
 const viewRef = ref<HTMLElement | null>(null);
 let unsub: (() => void) | undefined;
 let lastModel = "";
 let opened = false;
+let tickTimer: ReturnType<typeof setInterval> | undefined;
+
+function startActivity(title: string, step: string, hint: string): void {
+  activity.value = { title, step, hint, startedAt: Date.now() };
+  nowTick.value = Date.now();
+}
+
+function stopActivity(): void {
+  if (!busy.value && !waiting.value) activity.value = null;
+}
 
 watch(
   viewRef,
@@ -72,6 +103,7 @@ onMounted(async () => {
   unsub = window.lab.onEvent((ev) => {
     if (ev.method === "agent.text") {
       waiting.value = false;
+      stopActivity();
       messages.value.push({ role: "agent", text: String((ev.params as { text: string }).text) });
     }
     if (ev.method === "agent.tool") {
@@ -79,10 +111,22 @@ onMounted(async () => {
     }
     if (ev.method === "turn.done") {
       waiting.value = false;
+      stopActivity();
     }
     if (ev.method === "turn.error") {
       waiting.value = false;
+      stopActivity();
       messages.value.push({ role: "system", text: String((ev.params as { message: string }).message) });
+    }
+    if (ev.method === "job.progress") {
+      const p = ev.params as { step?: string; hint?: string };
+      if (activity.value && p.step) {
+        activity.value = {
+          ...activity.value,
+          step: String(p.step),
+          hint: String(p.hint || activity.value.hint),
+        };
+      }
     }
     if (ev.method === "approval.needed") {
       const p = ev.params as { id: string; method: string; params?: { command?: string } };
@@ -105,25 +149,104 @@ onMounted(async () => {
     model.value = info.model ?? "";
     policy.value = info.approvalPolicy ?? "never";
     workspace.value = info.workspace;
-    if (info.messages?.length) {
-      messages.value = info.messages.map((m) => ({
-        role: m.role as Msg["role"],
-        text: m.text,
-      }));
-    } else {
-      messages.value.push({
-        role: "system",
-        text: `Connected ${info.workspace} · thread ${info.threadId ?? "new"}`,
-      });
-    }
+    await hydrateSessions(info);
     await refreshAssets();
     const latest = info.lastAsset || (await window.lab.latestModel()).name;
     if (latest) await showModel(latest, false);
   }
   ready.value = true;
+  tickTimer = setInterval(() => {
+    nowTick.value = Date.now();
+  }, 1000);
 });
 
-onUnmounted(() => unsub?.());
+onUnmounted(() => {
+  unsub?.();
+  if (tickTimer) clearInterval(tickTimer);
+});
+
+function displayText(role: string, text: string): string {
+  if (role !== "user") return text;
+  const i = text.lastIndexOf("\nUser: ");
+  if (i >= 0) return text.slice(i + 7);
+  return text.replace(/^Stage:[^\n]*\n/, "");
+}
+
+function visibleMessages(list: Array<{ role: string; text: string }>): Msg[] {
+  return list
+    .filter((m) => m.role !== "tool")
+    .filter((m) => !/\[host\] Handled/.test(m.text))
+    .map((m) => ({
+      role: m.role as Msg["role"],
+      text: displayText(m.role, m.text),
+    }));
+}
+
+async function hydrateSessions(info?: {
+  sessionId?: number;
+  sessions?: Array<{ id: number; title: string; threadId: string }>;
+  messages?: Array<{ role: string; text: string }>;
+}): Promise<void> {
+  let sessionsList = info?.sessions ?? [];
+  let sid = info?.sessionId ?? 0;
+  let msgs = info?.messages;
+  if (!sessionsList.length && typeof window.lab.sessionList === "function") {
+    try {
+      const listed = await window.lab.sessionList();
+      sessionsList = listed.sessions ?? [];
+      sid = listed.sessionId ?? sid;
+      msgs = listed.messages ?? msgs;
+    } catch (err) {
+      messages.value.push({
+        role: "system",
+        text: `Chats need a LIVE restart (${String(err).slice(0, 120)})`,
+      });
+    }
+  }
+  sessions.value = sessionsList;
+  sessionId.value = sid || sessionsList[0]?.id || 0;
+  if (msgs) messages.value = visibleMessages(msgs);
+}
+
+async function applySession(r: {
+  sessionId: number;
+  sessions: Array<{ id: number; title: string; threadId: string }>;
+  messages?: Array<{ role: string; text: string }>;
+}): Promise<void> {
+  sessions.value = r.sessions ?? [];
+  sessionId.value = r.sessionId || sessions.value[0]?.id || 0;
+  messages.value = visibleMessages(r.messages ?? []);
+}
+
+async function newChat(): Promise<void> {
+  if (busy.value) return;
+  if (typeof window.lab.sessionNew !== "function") {
+    messages.value.push({
+      role: "system",
+      text: "New chat needs a LIVE restart (preload is stale).",
+    });
+    return;
+  }
+  try {
+    const r = await window.lab.sessionNew();
+    await applySession(r);
+  } catch (err) {
+    messages.value.push({ role: "system", text: `New chat failed: ${String(err)}` });
+  }
+}
+
+async function onSessionChange(ev: Event): Promise<void> {
+  if (busy.value) return;
+  const id = Number((ev.target as HTMLSelectElement).value);
+  if (!id) return;
+  sessionId.value = id;
+  try {
+    const r = await window.lab.sessionOpen(id);
+    await applySession(r);
+  } catch (err) {
+    messages.value.push({ role: "system", text: `Switch chat failed: ${String(err)}` });
+  }
+}
 
 function stageContext(): string {
   const title = assetName.value ? parseAssetName(assetName.value).label : "empty stage";
@@ -135,16 +258,30 @@ function stageContext(): string {
 async function send(): Promise<void> {
   const text = input.value.trim();
   if (!text && !pendingImage.value) return;
-  messages.value.push({ role: "user", text: text || `upload ${pendingLabel.value || "attachment"}` });
+  const spoken = text || `upload ${pendingLabel.value || "attachment"}`;
+  messages.value.push({ role: "user", text: spoken });
+  void window.lab.remember("user", spoken).then((r) => {
+    if (r.sessions?.length) sessions.value = r.sessions as typeof sessions.value;
+    if (r.sessionId) sessionId.value = r.sessionId;
+  });
   input.value = "";
   let intent = classifyIntent(text);
   if (pendingImage.value && (intent.kind === "chat" || !text)) {
-    if (!text || /生成|做成|3d|模型|图生|generate|make a 3d/i.test(text)) {
-      intent = { kind: "generate", prompt: text || "a 3d model matching this image", name: "ref" };
+    if (!text) {
+      intent = { kind: "generate", prompt: "a 3d model matching this image", name: "ref" };
     }
   }
   const wrapped = `${stageContext()}\nUser: ${text}${pendingImage.value ? `\nAttachment: ${pendingImage.value}` : ""}`;
   try {
+    if (busy.value && intent.kind !== "chat" && intent.kind !== "unsupported") {
+      messages.value.push({
+        role: "system",
+        text: activity.value
+          ? `Still ${activity.value.step}. Current mesh stays on stage until this job commits.`
+          : "A mesh job is still running.",
+      });
+      return;
+    }
     if (intent.kind === "blender-cube") await cube();
     else if (intent.kind === "blender-lamb") await lamb();
     else if (intent.kind === "generate") {
@@ -163,17 +300,30 @@ async function send(): Promise<void> {
     }
     else {
       waiting.value = true;
+      startActivity("Agent", "Reading the stage", "Codex is talking. No mesh job is running.");
       await window.lab.send(wrapped);
     }
     if (intent.kind !== "chat" && intent.kind !== "unsupported") {
       waiting.value = true;
+      startActivity(
+        "Agent recap",
+        "Writing a short note",
+        "The GLB is already on disk. Codex is only describing it.",
+      );
       await window.lab.send(
-        `${stageContext()}\n[host] Handled "${text}". Do not run Blender.app or tripo. Reply in English in one or two sentences about the current stage.`,
+        `${stageContext()}\n[host] Handled "${text}". Do not run Blender.app or tripo. Reply in compact Markdown: one short title line, then at most three bullets about the current mesh. No feature menu.`,
       );
     }
   } catch (err) {
     waiting.value = false;
     messages.value.push({ role: "system", text: String(err) });
+  }
+  try {
+    const listed = await window.lab.sessionList();
+    sessions.value = listed.sessions;
+    if (listed.sessionId) sessionId.value = listed.sessionId;
+  } catch {
+    /* session list is optional */
   }
 }
 
@@ -212,7 +362,13 @@ async function showConcept(rel: string): Promise<void> {
   if (!img.b64) return;
   const url = `data:image/png;base64,${img.b64}`;
   look.value = { ...look.value, concept: url, open: true };
-  veilLabel.value = "Concept ready · generating 3D";
+  if (activity.value) {
+    activity.value = {
+      ...activity.value,
+      step: "Tripo · image-to-3D",
+      hint: "Concept is on the lookbook. Meshing the next version.",
+    };
+  }
 }
 
 async function showModel(name: string, notify = true): Promise<void> {
@@ -276,10 +432,11 @@ async function removeAsset(name: string, ev: Event): Promise<void> {
   await refreshAssets();
 }
 
-async function runNamed(label: string, fn: () => Promise<{ path?: string }>): Promise<void> {
+async function runNamed(label: string, fn: () => Promise<{ path?: string }>, hint?: string): Promise<void> {
   const job = { id: jobSeq++, label, status: "running" };
   jobs.value.push(job);
   busy.value = true;
+  startActivity(label, label, hint || "Headless Blender on the host.");
   try {
     const r = await fn();
     const file = r?.path?.split("/").pop();
@@ -290,6 +447,7 @@ async function runNamed(label: string, fn: () => Promise<{ path?: string }>): Pr
     throw err;
   } finally {
     busy.value = false;
+    stopActivity();
   }
 }
 
@@ -306,7 +464,11 @@ async function editCurrent(prompt: string): Promise<void> {
   const family = parseAssetName(assetName.value).family;
   const before = captureProductPng() || capturePng();
   look.value = { before, concept: "", after: "", open: true };
-  veilLabel.value = "Generating concept…";
+  startActivity(
+    `Restyle ${family}`,
+    "Tripo · image-to-image",
+    "Same family, next version. Current mesh stays until the new GLB lands.",
+  );
   let imagePath = pendingImage.value;
   if (!imagePath) {
     if (before) {
@@ -333,7 +495,7 @@ async function editCurrent(prompt: string): Promise<void> {
     throw err;
   } finally {
     busy.value = false;
-    veilLabel.value = "Working…";
+    stopActivity();
   }
 }
 
@@ -346,6 +508,11 @@ async function transformCurrent(intent: {
   const job = { id: jobSeq++, label: `Blender · ${intent.op}`, status: "running" };
   jobs.value.push(job);
   busy.value = true;
+  startActivity(
+    `Transform · ${intent.op}`,
+    `Blender · ${intent.op}`,
+    "Headless pose/scale. A new version of this family will replace the stage.",
+  );
   try {
     const r = await window.lab.transform(assetName.value, intent.op, {
       height: intent.height,
@@ -359,6 +526,7 @@ async function transformCurrent(intent: {
     throw err;
   } finally {
     busy.value = false;
+    stopActivity();
   }
 }
 
@@ -427,9 +595,15 @@ function clearAttach(): void {
 }
 
 async function generate(prompt: string, name: string, imagePath?: string): Promise<void> {
-  const job = { id: jobSeq++, label: imagePath ? `Image-to-3D · ${name}` : `Tripo · ${name}`, status: "running" };
+  const step = imagePath ? "Tripo · image-to-3D" : "Tripo · text-to-3D";
+  const job = { id: jobSeq++, label: `${step} · ${name}`, status: "running" };
   jobs.value.push(job);
   busy.value = true;
+  startActivity(
+    `Generating ${name}`,
+    step,
+    "Host owns this job. The current mesh stays on stage until the new GLB is committed.",
+  );
   try {
     const r = await window.lab.generate(prompt, name, imagePath);
     const file = r?.path?.split("/").pop();
@@ -441,6 +615,7 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
     messages.value.push({ role: "system", text: String(err) });
   } finally {
     busy.value = false;
+    stopActivity();
   }
 }
 </script>
@@ -458,21 +633,36 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
         <span v-else-if="fake === false" class="badge live">LIVE</span>
       </header>
 
+      <div class="sess">
+        <select :value="String(sessionId || 0)" :disabled="busy" @change="onSessionChange">
+          <option v-if="!sessions.length" value="0">Chat</option>
+          <option v-for="s in sessions" :key="s.id" :value="String(s.id)">{{ s.title || "Chat" }}</option>
+        </select>
+        <button type="button" :disabled="busy" @click="newChat">New</button>
+      </div>
       <div class="chips">
         <span class="chip on">{{ stageTitle }}</span>
       </div>
-      <div v-if="jobs.length" class="jobs">
-        <div v-for="j in jobs" :key="j.id" class="job" :class="j.status">{{ j.label }} · {{ j.status }}</div>
+      <div v-if="activity" class="now">
+        <span class="now-dot" />
+        <div>
+          <strong>{{ activity.title }}</strong>
+          <em>{{ activity.step }} · {{ elapsed }}</em>
+        </div>
+      </div>
+      <div v-else-if="jobs.length" class="jobs">
+        <div v-for="j in jobs.slice(-3)" :key="j.id" class="job" :class="j.status">{{ j.label }} · {{ j.status }}</div>
       </div>
 
       <div class="log">
         <article v-for="(m, i) in messages.filter((x) => x.role !== 'tool')" :key="i" class="msg" :class="m.role">
           <span class="who">{{ m.role }}</span>
-          <p>{{ m.text }}</p>
+          <div v-if="m.role === 'agent'" class="md" v-html="renderMd(m.text)" />
+          <p v-else>{{ m.text }}</p>
         </article>
-        <article v-if="waiting" class="msg agent">
+        <article v-if="waiting && !busy" class="msg agent">
           <span class="who">agent</span>
-          <p class="pulse">Thinking…</p>
+          <p class="pulse">{{ activity?.step || "Writing…" }}</p>
         </article>
       </div>
 
@@ -499,16 +689,16 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
             accept="image/png,image/jpeg,image/webp,.glb,.gltf"
             @change="onPick"
           />
-          <button type="button" class="plus" :disabled="!ready || busy" aria-label="Attach" @click="fileRef?.click()">
+          <button type="button" class="plus" :disabled="!ready" aria-label="Attach" @click="fileRef?.click()">
             +
           </button>
           <input
             v-model="input"
-            :disabled="!ready || busy"
-            :placeholder="pendingImage ? `Image attached — send or say make it red` : `What 3D model do you want?`"
+            :disabled="!ready"
+            :placeholder="composerPlaceholder"
             @paste="onPaste"
           />
-          <button class="send" type="submit" :disabled="!ready || busy" aria-label="Send">↑</button>
+          <button class="send" type="submit" :disabled="!ready" aria-label="Send">↑</button>
         </form>
       </div>
     </aside>
@@ -526,10 +716,6 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
         <button type="button" :class="{ on: look.open }" @click="look.open = !look.open">Lookbook</button>
       </div>
       <div class="stage" ref="viewRef"></div>
-      <div v-if="busy" class="veil">
-        <img v-if="look.concept" :src="look.concept" alt="" />
-        <span>{{ veilLabel }}</span>
-      </div>
       <div v-if="look.open && (look.before || look.concept || look.after)" class="lookbook">
         <figure v-if="look.before">
           <img :src="look.before" alt="" />
@@ -561,8 +747,7 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
       <div class="hud">
         <span>{{ stageTitle }}</span>
         <span v-if="pickHint">Selected {{ pickHint }}</span>
-        <span v-if="busy">Exporting…</span>
-        <span v-else-if="waiting">Thinking…</span>
+        <span v-if="hudStatus">{{ hudStatus }}</span>
       </div>
     </main>
   </div>
@@ -635,6 +820,26 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
   padding: 2px 8px;
 }
 .chip.on { color: var(--accent); border-color: #7a4e28; }
+.sess {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 8px;
+}
+.sess select {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  padding: 6px 8px;
+  background: #10141c;
+  color: var(--text);
+  border-radius: 8px;
+}
+.sess button {
+  flex: none;
+  font-size: 11px;
+  padding: 6px 10px;
+  background: #243044;
+}
 .log {
   flex: 1;
   overflow: auto;
@@ -657,6 +862,34 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
   margin-bottom: 4px;
 }
 .msg p { margin: 0; white-space: pre-wrap; word-break: break-word; }
+.msg.agent .md { font-size: 13px; line-height: 1.45; color: #d7efe8; }
+.msg.agent .md p { margin: 0 0 6px; white-space: normal; }
+.msg.agent .md p:last-child { margin-bottom: 0; }
+.msg.agent .md ul { margin: 4px 0 6px; padding-left: 1.15em; }
+.msg.agent .md li { margin: 2px 0; }
+.msg.agent .md strong { color: #fff; font-weight: 650; }
+.msg.agent .md code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: #0e1a18;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #b8e0d4;
+}
+.msg.agent .md pre {
+  margin: 6px 0;
+  padding: 8px;
+  background: #0e1a18;
+  border-radius: 8px;
+  overflow: auto;
+}
+.msg.agent .md pre code { padding: 0; background: none; }
+.msg.agent .md h3, .msg.agent .md h4 {
+  margin: 8px 0 4px;
+  font-size: 13px;
+  color: #fff;
+}
+.msg.agent .md a { color: #8fd4c4; }
 .pulse { opacity: 0.7; }
 .msg.user { background: #243044; }
 .msg.agent { background: #17312c; }
@@ -734,6 +967,31 @@ form input {
   outline: none;
 }
 form input:focus { border-color: #5b6b88; }
+.now {
+  margin: 0 12px 8px;
+  padding: 7px 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #7a4e28;
+  background: #24180f;
+  border-radius: 10px;
+}
+.now-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(244, 162, 97, 0.7);
+  animation: ping 1.6s ease-out infinite;
+}
+@keyframes ping {
+  70% { box-shadow: 0 0 0 8px rgba(244, 162, 97, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 162, 97, 0); }
+}
+.now strong { display: block; font-size: 12px; color: var(--text); }
+.now em { display: block; font-style: normal; font-size: 11px; color: var(--accent); margin-top: 1px; }
 .jobs { padding: 0 16px 8px; display: flex; flex-direction: column; gap: 4px; }
 .job { font-size: 11px; color: var(--muted); }
 .job.running { color: var(--accent); }
@@ -751,21 +1009,7 @@ form input:focus { border-color: #5b6b88; }
 }
 .tools button.on { border-color: var(--accent); color: var(--accent); }
 .stage { position: absolute; inset: 36px 0 108px 0; background: #0e1116; }
-.veil {
-  position: absolute; inset: 36px 0 108px 0;
-  display: grid; place-items: center;
-  align-content: center;
-  gap: 10px;
-  background: rgba(8,10,14,0.55);
-  pointer-events: none;
-}
-.veil img {
-  max-width: 46%;
-  max-height: 58%;
-  object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.45);
-}
+
 .lookbook {
   position: absolute;
   left: 12px;
