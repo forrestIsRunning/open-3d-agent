@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="280" viewBox="0 0 920 280" role="img" aria-label="Fast path vs talk path">
+  <style>
+    .t { font: 600 15px ui-sans-serif, system-ui, sans-serif; fill: #e8ecf3; }
+    .s { font: 12px ui-sans-serif, system-ui, sans-serif; fill: #8b95a7; }
+    .box { fill: #161a22; stroke: #3a4254; stroke-width: 1.4; }
+    .fast { fill: #1e3a2f; stroke: #3dd68c; }
+    .talk { fill: #2a2418; stroke: #f4a261; }
+    .arr { stroke: #5b6b88; stroke-width: 1.5; fill: none; marker-end: url(#a); }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#5b6b88"/>
+    </marker>
+  </defs>
+  <text class="t" x="20" y="28">Fast path — desktop classifies, host builds, LLM recaps</text>
+  <rect class="box fast" x="16" y="44" width="130" height="52" rx="8"/>
+  <text class="s" x="81" y="66" text-anchor="middle" fill="#e8ecf3">“make it red”</text>
+  <text class="s" x="81" y="82" text-anchor="middle">classifyIntent</text>
+  <path class="arr" d="M146,70 H188"/>
+  <rect class="box" x="196" y="44" width="150" height="52" rx="8"/>
+  <text class="s" x="271" y="66" text-anchor="middle" fill="#e8ecf3">IPC lab:edit</text>
+  <text class="s" x="271" y="82" text-anchor="middle">no Codex yet</text>
+  <path class="arr" d="M346,70 H388"/>
+  <rect class="box" x="396" y="44" width="210" height="52" rx="8"/>
+  <text class="s" x="501" y="66" text-anchor="middle" fill="#e8ecf3">Tripo i2i → i23d</text>
+  <text class="s" x="501" y="82" text-anchor="middle">commit lab-husky_2.glb</text>
+  <path class="arr" d="M606,70 H648"/>
+  <rect class="box talk" x="656" y="44" width="248" height="52" rx="8"/>
+  <text class="s" x="780" y="66" text-anchor="middle" fill="#e8ecf3">turn/start recap</text>
+  <text class="s" x="780" y="82" text-anchor="middle">Codex describes the stage</text>
+
+  <text class="t" x="20" y="148">Talk path — Codex decides, host still builds</text>
+  <rect class="box talk" x="16" y="164" width="130" height="52" rx="8"/>
+  <text class="s" x="81" y="186" text-anchor="middle" fill="#e8ecf3">free-form chat</text>
+  <text class="s" x="81" y="202" text-anchor="middle">turn/start</text>
+  <path class="arr" d="M146,190 H188"/>
+  <rect class="box talk" x="196" y="164" width="150" height="52" rx="8"/>
+  <text class="s" x="271" y="186" text-anchor="middle" fill="#e8ecf3">item/tool/call</text>
+  <text class="s" x="271" y="202" text-anchor="middle">workspace_edit_3d</text>
+  <path class="arr" d="M346,190 H388"/>
+  <rect class="box" x="396" y="164" width="210" height="52" rx="8"/>
+  <text class="s" x="501" y="186" text-anchor="middle" fill="#e8ecf3">same host function</text>
+  <text class="s" x="501" y="202" text-anchor="middle">runEdit3d → commitModel</text>
+  <path class="arr" d="M606,190 H648"/>
+  <rect class="box" x="656" y="164" width="248" height="52" rx="8"/>
+  <text class="s" x="780" y="186" text-anchor="middle" fill="#e8ecf3">tool result = path</text>
+  <text class="s" x="780" y="202" text-anchor="middle">model.ready → stage</text>
+</svg>

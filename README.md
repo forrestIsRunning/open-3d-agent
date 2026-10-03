@@ -28,8 +28,9 @@ Chat on the left. A live GLB stage on the right. You talk; the **host** builds t
 
 Two ways to hit the same functions:
 
-1. **Fast path** — the desktop classifies “generate a husky” / “make it red” / “align to ground” and calls the host directly. Codex only recaps after the GLB exists.
-2. **Talk path** — free-form chat goes to Codex `turn/start`. If a mesh is needed, Codex emits `item/tool/call`; the host runs the tool and returns the new filename.
+<p align="center">
+  <img src="assets/paths.svg" alt="Fast path: classifyIntent then host then Codex recap. Talk path: Codex tool call then the same host function." width="920" />
+</p>
 
 ### Codex tools (`workspace_*`)
 

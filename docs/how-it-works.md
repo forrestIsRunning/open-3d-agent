@@ -81,3 +81,28 @@ The architecture drawing is the product view: you talk, the host makes the mesh,
 The implementation detail: **Electron never calls the LLM.** It only JSONL-talks to `host.ts`. The host is the one that starts `codex app-server` (isolated `CODEX_HOME`, `wire_api = responses`) and that execs Tripo/Blender with `--factory-startup --background`.
 
 That is why the green **LIVE** badge is “Codex is up”, and why a FAKE mode can still generate cubes: the host tools do not require a smart model.
+
+## One turn, in order
+
+**Fast path (“change the fur to golden-red”)**
+
+1. Renderer `classifyIntent` → `edit`.
+2. Capture a product shot (light ground, no grid) as `imagePath`.
+3. IPC `lab:edit` → host `runEdit3d` → Tripo image-to-image (concept event) → image-to-model → `commitModel(family)`.
+4. `model.ready` loads `lab-husky_2.glb`; filmstrip label `husky · v2`.
+5. Host asks Codex for a recap only: “do not run Blender.app or tripo”.
+
+**Talk path (free-form)**
+
+1. IPC `lab:send` → `turn/start` with stage prefix (`Stage: husky · v2`).
+2. Codex may `workspace_list_assets` then `workspace_edit_3d`.
+3. Host `onServerRequest` / `item/tool/call` runs the same `runEdit3d`.
+4. Tool result is the new path; viewer still keys off `model.ready`.
+
+**Approvals**
+
+`APPROVAL_POLICY=on-request` pauses Codex shell. Mesh tools are not shell — they do not go through that prompt. Deny a shell command and no extra GLB is written by that command.
+
+**Isolated Codex**
+
+`writeIsolatedCodexHome` writes in-repo `.codex-home/config.toml` (`wire_api = responses`, `OPENAI_BASE_URL` from env). The API key stays in `.env`, never in git.
