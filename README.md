@@ -3,7 +3,7 @@
 Chat on the left. A live GLB stage on the right. You talk; the **host** builds the mesh (Tripo or headless Blender). The LLM only comments — it never launches Blender.
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Open 3D Agent: husky on the live stage after a fur-color edit" width="920" />
+  <img src="assets/screenshot.png" alt="Open 3D Agent: session picker, live stage, husky v1/v2 and man v1 on the filmstrip" width="920" />
 </p>
 
 <p align="center">
