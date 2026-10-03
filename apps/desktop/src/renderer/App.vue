@@ -238,10 +238,9 @@ async function newChat(): Promise<void> {
 async function cancelJob(): Promise<void> {
   try {
     const r = await window.lab.cancel();
-    messages.value.push({
-      role: "system",
-      text: r?.ok ? "Cancelled the mesh job." : "Nothing to cancel (job already finished).",
-    });
+    if (!r?.ok) {
+      messages.value.push({ role: "system", text: "Nothing to cancel (job already finished)." });
+    }
   } catch (err) {
     messages.value.push({ role: "system", text: `Cancel failed: ${String(err)}` });
   }
@@ -315,6 +314,8 @@ async function send(): Promise<void> {
       startActivity("Agent", "Reading the stage", "Codex is talking. No mesh job is running.");
       await window.lab.send(wrapped);
     }
+    const lastJob = jobs.value.at(-1);
+    if (lastJob?.status === "fail") return;
     if (intent.kind !== "chat" && intent.kind !== "unsupported") {
       waiting.value = true;
       startActivity(
@@ -328,7 +329,11 @@ async function send(): Promise<void> {
     }
   } catch (err) {
     waiting.value = false;
-    messages.value.push({ role: "system", text: String(err) });
+    const msg = String(err);
+    messages.value.push({
+      role: "system",
+      text: /cancelled/i.test(msg) ? "Cancelled. Stage is unchanged." : msg,
+    });
   }
   try {
     const listed = await window.lab.sessionList();
@@ -624,7 +629,7 @@ async function generate(prompt: string, name: string, imagePath?: string): Promi
     if (file) await showModel(file);
   } catch (err) {
     job.status = "fail";
-    messages.value.push({ role: "system", text: String(err) });
+    throw err;
   } finally {
     busy.value = false;
     stopActivity();
